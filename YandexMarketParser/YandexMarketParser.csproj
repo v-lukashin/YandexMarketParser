@@ -1,0 +1,122 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="12.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
+  <PropertyGroup>
+    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+    <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
+    <ProjectGuid>{443DA270-4064-433C-8281-C6A2FD960D17}</ProjectGuid>
+    <OutputType>Exe</OutputType>
+    <AppDesignerFolder>Properties</AppDesignerFolder>
+    <RootNamespace>YandexMarketParser</RootNamespace>
+    <AssemblyName>YandexMarketParser</AssemblyName>
+    <TargetFrameworkVersion>v4.5</TargetFrameworkVersion>
+    <FileAlignment>512</FileAlignment>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
+    <PlatformTarget>AnyCPU</PlatformTarget>
+    <DebugSymbols>true</DebugSymbols>
+    <DebugType>full</DebugType>
+    <Optimize>false</Optimize>
+    <OutputPath>bin\Debug\</OutputPath>
+    <DefineConstants>DEBUG;TRACE</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
+    <PlatformTarget>AnyCPU</PlatformTarget>
+    <DebugType>pdbonly</DebugType>
+    <Optimize>true</Optimize>
+    <OutputPath>bin\Release\</OutputPath>
+    <DefineConstants>TRACE</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="AudienceCacheBuilder">
+      <HintPath>..\..\YacaParser\libs\Targetix\AudienceCacheBuilder.exe</HintPath>
+    </Reference>
+    <Reference Include="Couchbase">
+      <HintPath>..\..\YacaParser\libs\Couchbase\Couchbase.dll</HintPath>
+    </Reference>
+    <Reference Include="Enyim.Caching">
+      <HintPath>..\..\YacaParser\libs\Enyim.Caching\Enyim.Caching.dll</HintPath>
+    </Reference>
+    <Reference Include="HtmlAgilityPack">
+      <HintPath>..\..\YacaParser\libs\HtmlAgilityPack\HtmlAgilityPack.dll</HintPath>
+    </Reference>
+    <Reference Include="MongoDB.Bson">
+      <HintPath>..\..\YacaParser\libs\mongocsharpdriver\MongoDB.Bson.dll</HintPath>
+    </Reference>
+    <Reference Include="MongoDB.Driver">
+      <HintPath>..\..\YacaParser\libs\mongocsharpdriver\MongoDB.Driver.dll</HintPath>
+    </Reference>
+    <Reference Include="Newtonsoft.Json, Version=4.5.0.0, Culture=neutral, PublicKeyToken=30ad4fe6b2a6aeed, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>..\..\YacaParser\libs\Newtonsoft.Json\Newtonsoft.Json.dll</HintPath>
+    </Reference>
+    <Reference Include="NLog, Version=2.0.0.0, Culture=neutral, PublicKeyToken=5120e14c03d0593c, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>..\..\YacaParser\libs\NLog\NLog.dll</HintPath>
+    </Reference>
+    <Reference Include="NLog.Extended, Version=2.0.0.0, Culture=neutral, PublicKeyToken=5120e14c03d0593c, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>..\..\YacaParser\libs\NLog\NLog.Extended.dll</HintPath>
+    </Reference>
+    <Reference Include="NLog.MongoDB">
+      <HintPath>..\..\YacaParser\libs\NLog\NLog.MongoDB.dll</HintPath>
+    </Reference>
+    <Reference Include="System" />
+    <Reference Include="System.configuration" />
+    <Reference Include="System.Core" />
+    <Reference Include="System.Xml.Linq" />
+    <Reference Include="System.Data.DataSetExtensions" />
+    <Reference Include="Microsoft.CSharp" />
+    <Reference Include="System.Data" />
+    <Reference Include="System.Xml" />
+    <Reference Include="Targetix.AdMira.Config">
+      <HintPath>..\..\YacaParser\libs\Targetix\Targetix.AdMira.Config.dll</HintPath>
+    </Reference>
+    <Reference Include="Targetix.Couchbase">
+      <HintPath>..\..\YacaParser\libs\Targetix\Targetix.Couchbase.dll</HintPath>
+    </Reference>
+    <Reference Include="Targetix.Exceptions">
+      <HintPath>..\..\YacaParser\libs\Targetix\Targetix.Exceptions.dll</HintPath>
+    </Reference>
+    <Reference Include="Targetix.Helpers">
+      <HintPath>..\..\YacaParser\libs\Targetix\Targetix.Helpers.dll</HintPath>
+    </Reference>
+    <Reference Include="Targetix.Model">
+      <HintPath>..\..\YacaParser\libs\Targetix\Targetix.Model.dll</HintPath>
+    </Reference>
+    <Reference Include="Targetix.MongoDB">
+      <HintPath>..\..\YacaParser\libs\Targetix\Targetix.MongoDB.dll</HintPath>
+    </Reference>
+    <Reference Include="Targetix.MongoDB.Extensions">
+      <HintPath>..\..\YacaParser\libs\Targetix\Targetix.MongoDB.Extensions.dll</HintPath>
+    </Reference>
+    <Reference Include="Targetix.Repository">
+      <HintPath>..\..\YacaParser\libs\Targetix\Targetix.Repository.dll</HintPath>
+    </Reference>
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="Downloader.cs" />
+    <Compile Include="Models\Db.cs" />
+    <Compile Include="Models\Repository.cs" />
+    <Compile Include="Models\Catalog.cs" />
+    <Compile Include="Models\YandexMarket.cs" />
+    <Compile Include="Program.cs" />
+    <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="Spider.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="App.config" />
+  </ItemGroup>
+  <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+  <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
+       Other similar extension points exist, see Microsoft.Common.targets.
+  <Target Name="BeforeBuild">
+  </Target>
+  <Target Name="AfterBuild">
+  </Target>
+  -->
+</Project>
