@@ -21,7 +21,7 @@ namespace YandexMarketParser
 
         public static long countVisitsOnPages = 0;//количество пройденых страниц
         private HashSet<string> _visitedPages;//uri посещенных страниц
-        public static Dictionary<int, Catalog> _curPages;
+        public static List<Catalog> _curPages = new List<Catalog>();
 
         private const int _poolSize = 100;
 
@@ -42,12 +42,20 @@ namespace YandexMarketParser
         {
             ThreadPool.SetMaxThreads(_poolSize, _poolSize);
             _rep = new Repository(new Db(_connectionString));
-            _curPages = new Dictionary<int, Catalog>();
+            queue = new Queue<Catalog>();
+            _visitedPages = new HashSet<string>();
+
+                                                                                                        //do{
+                                                                                                        //    Console.WriteLine("Восстановить предыдущее состояние?(y/n):");
+                                                                                                        //    char ans = Console.ReadKey().KeyChar;
+                                                                                                        //    if (ans.Equals('y') || ans.Equals('д'))
+                                                                                                        //    {
+                                                                                                        //        ReadState();
+                                                                                                        //        break;
+                                                                                                        //    }else if (ans.Equals('n') || ans.Equals('н')) break;
+                                                                                                        //    else Console.WriteLine("Не то. Попробуем еще раз..");
+                                                                                                        //}while(true);
             ReadState();
-            if (queue == null || queue.Count == 0)
-            {
-                queue = new Queue<Catalog>(new Catalog[] { _rootCatalog });
-            }
 
             Console.Write("Download from db...");
             var all = _rep.GetAll();
@@ -61,6 +69,8 @@ namespace YandexMarketParser
 
             Task consoleTask = new Task(ConsoleComand);
             consoleTask.Start();
+            Task saver = new Task(() => { Thread.Sleep(600000); Saving(); });
+            saver.Start();
 
             sw = Stopwatch.StartNew();
             try
@@ -75,7 +85,7 @@ namespace YandexMarketParser
             {
                 //сохранить после освобождения пула
                 int a = 0, s;
-                while (a < _poolSize - 1)
+                while (a < _poolSize - 2)
                 {
                     ThreadPool.GetAvailableThreads(out a, out s);
                     Thread.Sleep(10000);
@@ -85,12 +95,11 @@ namespace YandexMarketParser
                 Console.ReadKey();
             }
         }
-
-        void Proc()
-        {
-            //new Downloader("http://market.yandex.ru/guru.xml?hid=765280&CMD=-RR=0,0,0,0-VIS=8070-CAT_ID=975895-BPOS=50-EXC=1-PG=10&greed_mode=false", "Root", y => y.Catalog = "ROOT").Processing();
+        static void Proc(){
+            Catalog cat = new Catalog { IsGuru = true, Name = "bla", Parent = "superBla", Uri = @"http://market.yandex.ru/guru.xml?hid=765280&CMD=-RR=0,0,0,0-VIS=8070-CAT_ID=975895-BPOS=30-EXC=1-PG=10&greed_mode=false" };
+            ThreadPool.QueueUserWorkItem(Downloader.WaitCallback, cat);
         }
-
+        
         void Processing()
         {
             Regex reg = new Regex(patternCatalog);
@@ -103,11 +112,6 @@ namespace YandexMarketParser
                     //SaveState();
                     Catalog catalog = queue.Dequeue();
                     log.Info("Извлечен следующий каталог {0}", catalog.Uri);
-                    Action<YandexMarket> action = y =>
-                    {
-                        y.Catalog = catalog.Name;
-                        y.Parent = catalog.Parent;
-                    };
 
                     link = catalog.Uri;
                     string page = DownloadPage(link);
@@ -170,7 +174,7 @@ namespace YandexMarketParser
             cli.BaseAddress = "http://market.yandex.ru";
             cli.Proxy = null;
             cli.Encoding = Encoding.UTF8;
-
+            
             string page = null;
             for (int i = 0; i < 10; i++)
             {
@@ -181,7 +185,8 @@ namespace YandexMarketParser
                 }
                 catch (WebException wexc)
                 {
-                    Console.WriteLine("TimeoutError({0}). Repeat", i);
+                    Console.WriteLine("WebException({0}). Repeat", i);
+                    Console.WriteLine(wexc.Message + wexc.StackTrace);
                     continue;
                 }
             }
@@ -193,27 +198,38 @@ namespace YandexMarketParser
         void Saving()
         {
             Console.Write("Saving...");
+            var vis = _visitedPages.ToArray();
+            var que = queue.ToArray();
+            var pag = _curPages.ToArray();
+
             var val = AllSites.Values.ToArray();
             foreach (var v in val)
             {
                 _rep.Save(v);
             }
-            //SaveState();
             Console.WriteLine("done");
+
+            SaveState(que, vis, pag);
         }
 
-        void SaveState()
+        void SaveState(Catalog[] que, string[] vis, Catalog[] pag)
         {
             Console.Write("Saving state...");
             using (FileStream fs = new FileStream("Queue.txt", FileMode.Create))
             {
-                string jsonStr = JsonConvert.SerializeObject(queue);
+                string jsonStr = JsonConvert.SerializeObject(que);
                 byte[] res = System.Text.Encoding.UTF8.GetBytes(jsonStr);
                 fs.Write(res, 0, res.Length);
             }
             using (FileStream fs = new FileStream("VisitedPages.txt", FileMode.Create))
             {
-                string jsonStr = JsonConvert.SerializeObject(_visitedPages);
+                string jsonStr = JsonConvert.SerializeObject(vis);
+                byte[] res = System.Text.Encoding.UTF8.GetBytes(jsonStr);
+                fs.Write(res, 0, res.Length);
+            }
+            using (FileStream fs = new FileStream("CurrentPages.txt", FileMode.Create))
+            {
+                string jsonStr = JsonConvert.SerializeObject(pag);
                 byte[] res = System.Text.Encoding.UTF8.GetBytes(jsonStr);
                 fs.Write(res, 0, res.Length);
             }
@@ -227,15 +243,33 @@ namespace YandexMarketParser
             {
                 byte[] byteArr = new byte[fs.Length];
                 fs.Read(byteArr, 0, byteArr.Length);
-                Queue<Catalog> res = JsonConvert.DeserializeObject<Queue<Catalog>>(System.Text.Encoding.UTF8.GetString(byteArr));
-                queue = res;
+                Catalog[] res = JsonConvert.DeserializeObject<Catalog[]>(System.Text.Encoding.UTF8.GetString(byteArr));
+                if (res == null || res.Length == 0) res = new Catalog[] { _rootCatalog };
+                foreach (var c in res)
+                {
+                    queue.Enqueue(c);
+                }
             }
             using (FileStream fs = new FileStream("VisitedPages.txt", FileMode.OpenOrCreate))
             {
                 byte[] byteArr = new byte[fs.Length];
                 fs.Read(byteArr, 0, byteArr.Length);
-                HashSet<string> res = JsonConvert.DeserializeObject<HashSet<string>>(System.Text.Encoding.UTF8.GetString(byteArr));
-                _visitedPages = res ?? new HashSet<string>();
+                string[] res = JsonConvert.DeserializeObject<string[]>(System.Text.Encoding.UTF8.GetString(byteArr)) ?? new string[0];
+                foreach (var v in res)
+                {
+                    _visitedPages.Add(v);
+                }
+
+            }
+            using (FileStream fs = new FileStream("CurrentPages.txt", FileMode.OpenOrCreate))
+            {
+                byte[] byteArr = new byte[fs.Length];
+                fs.Read(byteArr, 0, byteArr.Length);
+                Catalog[] res = JsonConvert.DeserializeObject<Catalog[]>(System.Text.Encoding.UTF8.GetString(byteArr)) ?? new Catalog[0];
+                foreach (var c in res)
+                {
+                    ThreadPool.QueueUserWorkItem(Downloader.WaitCallback, c);
+                }
             }
             Console.WriteLine("done");
         }

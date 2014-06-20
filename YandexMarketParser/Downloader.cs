@@ -25,6 +25,7 @@ namespace YandexMarketParser
         private const string patternPrice = @"<span class=""b(?:-old)?-prices__num"">(?<price>[\s\d]*)</span>";
         private const string patternDescription = @"<p class=""b-offers__spec"">(?<desc>[\w\p{P}\p{S}\s]*?)(?:<span class=""b-more""><span class=""b-more__dots"">.</span><span class=""b-more__text"">(?<desc2>.*?)</span>.*?</span>)?</p>";
         private const string patternNext = @"<a class=""b-pager__next"" href=""(?<uri>[\w\p{P}\p{S}]*)"">[\w ]*</a>";
+        private const string patternCountGuru = @"<p>[\s]*выбрано.моделей[\s]*.+?(?<cnt>[\d]+)</p></div></form>";//к.о.с.т.ы.л.ь(начало)
 
         public Downloader(Catalog cat)
         {
@@ -35,14 +36,14 @@ namespace YandexMarketParser
         }
 
         public static void WaitCallback(object state)
-        { 
+        {
             //StateOptions opt = (StateOptions)state;
             new Downloader((Catalog)state).Processing();
         }
 
         public void Processing()
         {
-            Spider._curPages.Add(_threadId, _catalog);
+            Spider._curPages.Add(_catalog);
             Console.WriteLine("Start : {0}", _catalog.Name);
             do
             {
@@ -63,16 +64,11 @@ namespace YandexMarketParser
                     Regex regDescr = new Regex(patternDescription);
                     Regex regPrice = new Regex(patternPrice);
                     int lastIndex = 0;
-                    foreach(Match match in matches)
+                    foreach (Match match in matches)
                     {
                         string name = match.Groups["name"].Value;
 
-                        YandexMarket s = null;
-                        if (_cache.ContainsKey(name))
-                        {
-                            s = _cache[name];
-                        }
-                        else
+                        if (!_cache.ContainsKey(name))
                         {
                             string descr = "";
                             Match descrMatch = regDescr.Match(root, match.Index);
@@ -91,7 +87,7 @@ namespace YandexMarketParser
                                 price = int.Parse(priceReplace);
                             }
 
-                            s = new YandexMarket { Name = name, Price = price, Description = descr, Catalog = _catalog.Name, Parent = _catalog.Parent };
+                            YandexMarket s = new YandexMarket { Name = name, Price = price, Description = descr, Catalog = _catalog.Name, Parent = _catalog.Parent };
                             _cache.Add(name, s);
                         }
                     }
@@ -104,11 +100,9 @@ namespace YandexMarketParser
                     if (nextPage.Success)
                     {
                         _catalog.Uri = nextPage.Groups["uri"].Value;
-                        //Spider._curPages[_threadId].Uri = _link;
-                        //Console.WriteLine(_link);
+                        if (_catalog.IsGuru) _catalog.Uri = new Regex("amp;").Replace(_catalog.Uri, "");
                     }
                     else break;
-
                 }
                 catch (Exception exc)
                 {
@@ -116,7 +110,7 @@ namespace YandexMarketParser
                     Console.WriteLine("#####DownloaderError##{0}", _catalog.Uri);
                 }
             } while (true);
-            Spider._curPages.Remove(_threadId);
+            Spider._curPages.Remove(_catalog);
             Console.WriteLine("Finish : {0}", _catalog.Name);
         }
     }
