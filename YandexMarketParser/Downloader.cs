@@ -17,7 +17,10 @@ namespace YandexMarketParser
         Logger log = LogManager.GetCurrentClassLogger();
 
         private Catalog _catalog;
+        private string catName;
         private readonly Dictionary<string, YandexMarket> _cache;
+
+        private readonly WebClient cli;
 
         private const string patternTitle = @"<h3 class=""b-offers__title""><a (?:[-\w=""]*) class=""b-offers__name(?:.*?)"">(?<name>.*?)</a>";
         private const string patternPrice = @"<span class=""b(?:-old)?-prices__num"">(?<price>[\s\d]*)</span>";
@@ -28,8 +31,14 @@ namespace YandexMarketParser
         public Downloader(Catalog cat)
         {
             _catalog = cat;
+            catName = _catalog.Name;
             //_link = cat.Uri;
             _cache = Spider.AllSites;
+
+            cli = new WebClient();
+            cli.BaseAddress = "http://market.yandex.ru";
+            cli.Proxy = null;
+            cli.Encoding = Encoding.UTF8;
         }
 
         public static void WaitCallback(object state)
@@ -40,12 +49,12 @@ namespace YandexMarketParser
 
         public void Processing()
         {
-            Console.WriteLine("Start : {0}", _catalog.Name);
+            Console.WriteLine("Start : {0}", catName);
             do
             {
                 try
                 {
-                    string root = Spider.DownloadPage(_catalog.Uri);
+                    string root = DownloadPage(_catalog.Uri);
 
                     if (root == null)
                     {
@@ -107,7 +116,32 @@ namespace YandexMarketParser
                 }
             } while (true);
             _catalog = null;
-            Console.WriteLine("Finish : {0}", _catalog.Name);
+            Console.WriteLine("Finish : {0}", catName);
+        }
+
+        /// <summary>
+        /// 10 попыток получить страницу. Если null, значит получить не удалось
+        /// </summary>
+        /// <param name="link"></param>
+        /// <returns></returns>
+        public string DownloadPage(string link)
+        {
+            string page = null;
+            for (int i = 0; i < 10; i++)
+            {
+                try
+                {
+                    page = cli.DownloadString(link);
+                    break;
+                }
+                catch (WebException wexc)
+                {
+                    Console.WriteLine("WebException({0}). Repeat downloading {1}", i, link);
+                    Console.WriteLine(wexc.Message + wexc.StackTrace);
+                    continue;
+                }
+            }
+            return page;
         }
     }
 }

@@ -88,17 +88,16 @@ namespace YandexMarketParser
                 else if (ans.Equals('n') || ans.Equals('н'))
                 {
                     Console.WriteLine("Значит начнем сначала");
-                    _catalogs = GetAllListCatalogs();
+                    _catalogs = GetAllSheetCatalogs();
+                    SaveState();
                     break;
                 }
                 else Console.WriteLine("Не то. Попробуем еще раз..");
             } while (true);
 
-            SaveState();
-
             StartHelperTasks();
 
-            foreach (var catalog in _catalogs)
+            foreach (var catalog in _catalogs)//par?
             {
                 if (catalog != null) ThreadPool.QueueUserWorkItem(Downloader.WaitCallback, catalog);
                 else Console.WriteLine("Найденый каталог равен null");
@@ -108,7 +107,7 @@ namespace YandexMarketParser
         /// Находит все листовые каталоги
         /// </summary>
         /// <returns></returns>
-        List<Catalog> GetAllListCatalogs()
+        List<Catalog> GetAllSheetCatalogs()
         {
             List<Catalog> res = new List<Catalog>();
             Queue<Catalog> queue = new Queue<Catalog>();
@@ -151,7 +150,7 @@ namespace YandexMarketParser
                         //добавить в очередь
                         queue.Enqueue(new Catalog { Uri = uri, Name = name, Parent = catalog.Parent + "/" + catalog.Name, IsGuru = guru });
 
-                        Console.WriteLine("href : {0}// Name : {1}", uri, name);
+                        Console.WriteLine("Найден каталог : {0} //href : {1}", name, uri);
                     }
                 }
                 catch (Exception e)
@@ -186,7 +185,7 @@ namespace YandexMarketParser
                 }
                 catch (WebException wexc)
                 {
-                    Console.WriteLine("WebException({0}). Repeat", i);
+                    Console.WriteLine("WebException({0}). Repeat downloading {1}", i, link);
                     Console.WriteLine(wexc.Message + wexc.StackTrace);
                     continue;
                 }
@@ -254,7 +253,7 @@ namespace YandexMarketParser
                 {
                     case "save": Saving(); break;
                     case "vis": Console.WriteLine("Visits on pages {0}", countVisitsOnPages); break;
-                    case "cat": Console.WriteLine("Catalogs left {0}", _catalogs.Count); break;
+                    case "cat": Console.WriteLine("Catalogs left {0}", _catalogs.Where(x=>x != null).Count()); break;
                     case "pool": ThreadPool.GetAvailableThreads(out a, out s); Console.WriteLine("Available threads {0}/{1}", a, _poolSize); break;
                     case "time": Console.WriteLine("Time working {0}min", sw.Elapsed.TotalMinutes); break;
                     case "cnt":
