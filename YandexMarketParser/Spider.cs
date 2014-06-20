@@ -20,8 +20,7 @@ namespace YandexMarketParser
         public static Dictionary<string, YandexMarket> AllSites = new Dictionary<string, YandexMarket>(150000);//здесь хранится весь каталог
 
         public static long countVisitsOnPages = 0;//количество пройденых страниц
-        private HashSet<string> _visitedPages;//uri посещенных страниц
-        public static List<Catalog> _curPages = new List<Catalog>();
+        private List<Catalog> _catalogs;
 
         private const int _poolSize = 100;
 
@@ -29,34 +28,19 @@ namespace YandexMarketParser
 
         Logger log = LogManager.GetCurrentClassLogger();
 
-        Queue<Catalog> queue;
         private readonly Catalog _rootCatalog = new Catalog { Name = "ROOT", Parent = "", IsGuru = false, Uri = "/catalog.xml" };
 
         private readonly Repository _rep;
         private const string _connectionString = "mongodb://localhost:27017/YandexMarket";
 
-        private const string patternCatalog = @"<div class=""supcat(?<guru> guru)?""><a href=""(?<uri>/catalog.xml\?hid=\d*)"">(?:<img[\w\p{P}\p{S} ]*>)?(?<name>[-\w,. ]*)</a>";
+        private const string patternCatalog = @"<div class=""supcat(?<guru> guru)?""><a href=""(?<uri>/catalog.xml\?hid=\d*)"">(?:<img[\w\p{P}\p{S} ]*?>)?(?<name>[-\w,. ]*?)</a>";
         private const string patternAll = @"<a class=""top-3-models__title-link"" href=""(?<uri>[-\w\p{P}\p{S} ]*)"">Посмотреть все модели</a>";
 
         public Spider()
         {
             ThreadPool.SetMaxThreads(_poolSize, _poolSize);
             _rep = new Repository(new Db(_connectionString));
-            queue = new Queue<Catalog>();
-            _visitedPages = new HashSet<string>();
-
-                                                                                                        //do{
-                                                                                                        //    Console.WriteLine("Восстановить предыдущее состояние?(y/n):");
-                                                                                                        //    char ans = Console.ReadKey().KeyChar;
-                                                                                                        //    if (ans.Equals('y') || ans.Equals('д'))
-                                                                                                        //    {
-                                                                                                        //        ReadState();
-                                                                                                        //        break;
-                                                                                                        //    }else if (ans.Equals('n') || ans.Equals('н')) break;
-                                                                                                        //    else Console.WriteLine("Не то. Попробуем еще раз..");
-                                                                                                        //}while(true);
-            ReadState();
-
+            _catalogs = new List<Catalog>();
             Console.Write("Download from db...");
             var all = _rep.GetAll();
             foreach (var it in all)
@@ -67,18 +51,13 @@ namespace YandexMarketParser
 
             Console.WriteLine("Start {0}", DateTime.Now);
 
-            Task consoleTask = new Task(ConsoleComand);
-            consoleTask.Start();
-            Task saver = new Task(() => { Thread.Sleep(600000); Saving(); });
-            saver.Start();
-
             sw = Stopwatch.StartNew();
             try
             {
                 log.Info("Start processing");
-                //Proc();
+
                 Processing();
-                //ProcOther();
+
                 log.Info("Finish processing");
             }
             finally
@@ -95,13 +74,46 @@ namespace YandexMarketParser
                 Console.ReadKey();
             }
         }
-        static void Proc(){
-            Catalog cat = new Catalog { IsGuru = true, Name = "bla", Parent = "superBla", Uri = @"http://market.yandex.ru/guru.xml?hid=765280&CMD=-RR=0,0,0,0-VIS=8070-CAT_ID=975895-BPOS=30-EXC=1-PG=10&greed_mode=false" };
-            ThreadPool.QueueUserWorkItem(Downloader.WaitCallback, cat);
-        }
-        
         void Processing()
         {
+            do
+            {
+                Console.WriteLine("Восстановить предыдущее состояние?(y/n):");
+                char ans = Console.ReadKey().KeyChar;
+                if (ans.Equals('y') || ans.Equals('д'))
+                {
+                    ReadState();
+                    break;
+                }
+                else if (ans.Equals('n') || ans.Equals('н'))
+                {
+                    Console.WriteLine("Значит начнем сначала");
+                    _catalogs = GetAllListCatalogs();
+                    break;
+                }
+                else Console.WriteLine("Не то. Попробуем еще раз..");
+            } while (true);
+
+            SaveState();
+
+            StartHelperTasks();
+
+            foreach (var catalog in _catalogs)
+            {
+                if (catalog != null) ThreadPool.QueueUserWorkItem(Downloader.WaitCallback, catalog);
+                else Console.WriteLine("Найденый каталог равен null");
+            }
+        }
+        /// <summary>
+        /// Находит все листовые каталоги
+        /// </summary>
+        /// <returns></returns>
+        List<Catalog> GetAllListCatalogs()
+        {
+            List<Catalog> res = new List<Catalog>();
+            Queue<Catalog> queue = new Queue<Catalog>();
+            queue.Enqueue(_rootCatalog);
+
             Regex reg = new Regex(patternCatalog);
             string link = "";
 
@@ -109,7 +121,6 @@ namespace YandexMarketParser
             {
                 try
                 {
-                    //SaveState();
                     Catalog catalog = queue.Dequeue();
                     log.Info("Извлечен следующий каталог {0}", catalog.Uri);
 
@@ -120,15 +131,15 @@ namespace YandexMarketParser
                     MatchCollection matches = reg.Matches(page);
                     if (matches.Count == 0)
                     {
-                        Console.WriteLine("Найден лист {0}", catalog.Name);
+                        Console.WriteLine("\t\tНайден лист {0}", catalog.Name);
                         Regex regAll = new Regex(patternAll);//встречается только в guru
                         Match match = regAll.Match(page);
                         if (match.Success)
                         {
                             catalog.Uri = match.Groups["uri"].Value;
                         }
-                        Console.WriteLine("Uri : {0}", catalog.Uri);
-                        ThreadPool.QueueUserWorkItem(Downloader.WaitCallback, catalog);
+                        Console.WriteLine("\t\tUri : {0}", catalog.Uri);
+                        res.Add(catalog);
                         continue;
                     }
                     foreach (Match match in matches)
@@ -137,20 +148,10 @@ namespace YandexMarketParser
                         string name = match.Groups["name"].Value;
                         bool guru = match.Groups["guru"].Value == " guru";
 
-                        //Если не посещали
-                        if (!_visitedPages.Contains(uri))
-                        {
-                            //добавить в очередь
-                            queue.Enqueue(new Catalog { Uri = uri, Name = name, Parent = catalog.Parent + "/" + catalog.Name, IsGuru = guru });
+                        //добавить в очередь
+                        queue.Enqueue(new Catalog { Uri = uri, Name = name, Parent = catalog.Parent + "/" + catalog.Name, IsGuru = guru });
 
-                            Console.WriteLine("href : {0}// Name : {1}", uri, name);
-                            _visitedPages.Add(uri);
-                        }
-                        else
-                        {
-                            Console.WriteLine("------Каталог уже был--{0}--{1}-------", uri, name);
-                            log.Info("------Каталог уже был--{0}--{1}-------", uri, name);
-                        }
+                        Console.WriteLine("href : {0}// Name : {1}", uri, name);
                     }
                 }
                 catch (Exception e)
@@ -159,7 +160,7 @@ namespace YandexMarketParser
                     Console.WriteLine("###SpiderError#{0}", link);
                 }
             }
-            Saving();
+            return res;
         }
 
         /// <summary>
@@ -174,7 +175,7 @@ namespace YandexMarketParser
             cli.BaseAddress = "http://market.yandex.ru";
             cli.Proxy = null;
             cli.Encoding = Encoding.UTF8;
-            
+
             string page = null;
             for (int i = 0; i < 10; i++)
             {
@@ -197,10 +198,9 @@ namespace YandexMarketParser
 
         void Saving()
         {
+            SaveState();
+
             Console.Write("Saving...");
-            var vis = _visitedPages.ToArray();
-            var que = queue.ToArray();
-            var pag = _curPages.ToArray();
 
             var val = AllSites.Values.ToArray();
             foreach (var v in val)
@@ -208,28 +208,14 @@ namespace YandexMarketParser
                 _rep.Save(v);
             }
             Console.WriteLine("done");
-
-            SaveState(que, vis, pag);
         }
 
-        void SaveState(Catalog[] que, string[] vis, Catalog[] pag)
+        void SaveState()
         {
             Console.Write("Saving state...");
-            using (FileStream fs = new FileStream("Queue.txt", FileMode.Create))
+            using (FileStream fs = new FileStream("Catalogs.txt", FileMode.Create))
             {
-                string jsonStr = JsonConvert.SerializeObject(que);
-                byte[] res = System.Text.Encoding.UTF8.GetBytes(jsonStr);
-                fs.Write(res, 0, res.Length);
-            }
-            using (FileStream fs = new FileStream("VisitedPages.txt", FileMode.Create))
-            {
-                string jsonStr = JsonConvert.SerializeObject(vis);
-                byte[] res = System.Text.Encoding.UTF8.GetBytes(jsonStr);
-                fs.Write(res, 0, res.Length);
-            }
-            using (FileStream fs = new FileStream("CurrentPages.txt", FileMode.Create))
-            {
-                string jsonStr = JsonConvert.SerializeObject(pag);
+                string jsonStr = JsonConvert.SerializeObject(_catalogs.ToArray());
                 byte[] res = System.Text.Encoding.UTF8.GetBytes(jsonStr);
                 fs.Write(res, 0, res.Length);
             }
@@ -239,39 +225,22 @@ namespace YandexMarketParser
         void ReadState()
         {
             Console.Write("Reading state...");
-            using (FileStream fs = new FileStream("Queue.txt", FileMode.OpenOrCreate))
-            {
-                byte[] byteArr = new byte[fs.Length];
-                fs.Read(byteArr, 0, byteArr.Length);
-                Catalog[] res = JsonConvert.DeserializeObject<Catalog[]>(System.Text.Encoding.UTF8.GetString(byteArr));
-                if (res == null || res.Length == 0) res = new Catalog[] { _rootCatalog };
-                foreach (var c in res)
-                {
-                    queue.Enqueue(c);
-                }
-            }
-            using (FileStream fs = new FileStream("VisitedPages.txt", FileMode.OpenOrCreate))
-            {
-                byte[] byteArr = new byte[fs.Length];
-                fs.Read(byteArr, 0, byteArr.Length);
-                string[] res = JsonConvert.DeserializeObject<string[]>(System.Text.Encoding.UTF8.GetString(byteArr)) ?? new string[0];
-                foreach (var v in res)
-                {
-                    _visitedPages.Add(v);
-                }
-
-            }
-            using (FileStream fs = new FileStream("CurrentPages.txt", FileMode.OpenOrCreate))
+            using (FileStream fs = new FileStream("Catalogs.txt", FileMode.OpenOrCreate))
             {
                 byte[] byteArr = new byte[fs.Length];
                 fs.Read(byteArr, 0, byteArr.Length);
                 Catalog[] res = JsonConvert.DeserializeObject<Catalog[]>(System.Text.Encoding.UTF8.GetString(byteArr)) ?? new Catalog[0];
-                foreach (var c in res)
-                {
-                    ThreadPool.QueueUserWorkItem(Downloader.WaitCallback, c);
-                }
+                _catalogs.AddRange(res);
             }
             Console.WriteLine("done");
+        }
+
+        void StartHelperTasks()
+        {
+            Task consoleTask = new Task(ConsoleComand);
+            consoleTask.Start();
+            Task saver = new Task(() => { Thread.Sleep(600000); Saving(); });
+            saver.Start();
         }
 
         void ConsoleComand()
@@ -285,7 +254,7 @@ namespace YandexMarketParser
                 {
                     case "save": Saving(); break;
                     case "vis": Console.WriteLine("Visits on pages {0}", countVisitsOnPages); break;
-                    case "que": Console.WriteLine("Queue lenght {0}", queue.Count); break;
+                    case "cat": Console.WriteLine("Catalogs left {0}", _catalogs.Count); break;
                     case "pool": ThreadPool.GetAvailableThreads(out a, out s); Console.WriteLine("Available threads {0}/{1}", a, _poolSize); break;
                     case "time": Console.WriteLine("Time working {0}min", sw.Elapsed.TotalMinutes); break;
                     case "cnt":

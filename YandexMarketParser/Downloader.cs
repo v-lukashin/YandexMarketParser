@@ -16,9 +16,7 @@ namespace YandexMarketParser
     {
         Logger log = LogManager.GetCurrentClassLogger();
 
-        //private string _link;
         private Catalog _catalog;
-        private int _threadId;
         private readonly Dictionary<string, YandexMarket> _cache;
 
         private const string patternTitle = @"<h3 class=""b-offers__title""><a (?:[-\w=""]*) class=""b-offers__name(?:.*?)"">(?<name>.*?)</a>";
@@ -32,7 +30,6 @@ namespace YandexMarketParser
             _catalog = cat;
             //_link = cat.Uri;
             _cache = Spider.AllSites;
-            _threadId = Thread.CurrentThread.ManagedThreadId;
         }
 
         public static void WaitCallback(object state)
@@ -43,7 +40,6 @@ namespace YandexMarketParser
 
         public void Processing()
         {
-            Spider._curPages.Add(_catalog);
             Console.WriteLine("Start : {0}", _catalog.Name);
             do
             {
@@ -110,7 +106,7 @@ namespace YandexMarketParser
                     Console.WriteLine("#####DownloaderError##{0}", _catalog.Uri);
                 }
             } while (true);
-            Spider._curPages.Remove(_catalog);
+            _catalog = null;
             Console.WriteLine("Finish : {0}", _catalog.Name);
         }
     }
