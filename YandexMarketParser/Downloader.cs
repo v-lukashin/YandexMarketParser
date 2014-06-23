@@ -115,7 +115,7 @@ namespace YandexMarketParser
                     Console.WriteLine("#####DownloaderError##{0}", _catalog.Uri);
                 }
             } while (true);
-            _catalog = null;
+            _catalog.Uri = null;
             Console.WriteLine("Finish : {0}", catName);
         }
 

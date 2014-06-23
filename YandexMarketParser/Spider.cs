@@ -99,7 +99,7 @@ namespace YandexMarketParser
 
             foreach (var catalog in _catalogs)//par?
             {
-                if (catalog != null) ThreadPool.QueueUserWorkItem(Downloader.WaitCallback, catalog);
+                if (!string.IsNullOrEmpty(catalog.Uri)) ThreadPool.QueueUserWorkItem(Downloader.WaitCallback, catalog);
                 else Console.WriteLine("Найденый каталог равен null");
             }
         }
@@ -253,7 +253,7 @@ namespace YandexMarketParser
                 {
                     case "save": Saving(); break;
                     case "vis": Console.WriteLine("Visits on pages {0}", countVisitsOnPages); break;
-                    case "cat": Console.WriteLine("Catalogs left {0}", _catalogs.Where(x=>x != null).Count()); break;
+                    case "cat": Console.WriteLine("Catalogs left {0}", _catalogs.Where(x=>x.Uri != null).Count()); break;
                     case "pool": ThreadPool.GetAvailableThreads(out a, out s); Console.WriteLine("Available threads {0}/{1}", a, _poolSize); break;
                     case "time": Console.WriteLine("Time working {0}min", sw.Elapsed.TotalMinutes); break;
                     case "cnt":
