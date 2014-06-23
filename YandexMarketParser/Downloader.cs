@@ -136,8 +136,8 @@ namespace YandexMarketParser
                 }
                 catch (WebException wexc)
                 {
-                    Console.WriteLine("WebException({0}). Repeat downloading {1}", i, link);
-                    Console.WriteLine(wexc.Message + wexc.StackTrace);
+                    Console.WriteLine("\nWebException({0}). Repeat downloading {1}", i, link);
+                    Console.WriteLine(wexc.Message);
                     continue;
                 }
             }

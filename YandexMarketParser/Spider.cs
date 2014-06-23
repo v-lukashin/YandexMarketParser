@@ -238,7 +238,7 @@ namespace YandexMarketParser
         {
             Task consoleTask = new Task(ConsoleComand);
             consoleTask.Start();
-            Task saver = new Task(() => { Thread.Sleep(600000); Saving(); });
+            Task saver = new Task(() => { while (true) { Thread.Sleep(600000); Saving(); } });
             saver.Start();
         }
 
