@@ -47,17 +47,8 @@
     <WarningLevel>4</WarningLevel>
   </PropertyGroup>
   <ItemGroup>
-    <Reference Include="AudienceCacheBuilder">
-      <HintPath>..\..\YacaParser\libs\Targetix\AudienceCacheBuilder.exe</HintPath>
-    </Reference>
-    <Reference Include="Couchbase">
-      <HintPath>..\..\YacaParser\libs\Couchbase\Couchbase.dll</HintPath>
-    </Reference>
     <Reference Include="Enyim.Caching">
       <HintPath>..\..\YacaParser\libs\Enyim.Caching\Enyim.Caching.dll</HintPath>
-    </Reference>
-    <Reference Include="HtmlAgilityPack">
-      <HintPath>..\..\YacaParser\libs\HtmlAgilityPack\HtmlAgilityPack.dll</HintPath>
     </Reference>
     <Reference Include="MongoDB.Bson">
       <HintPath>..\..\YacaParser\libs\mongocsharpdriver\MongoDB.Bson.dll</HintPath>
@@ -88,20 +79,8 @@
     <Reference Include="Microsoft.CSharp" />
     <Reference Include="System.Data" />
     <Reference Include="System.Xml" />
-    <Reference Include="Targetix.AdMira.Config">
-      <HintPath>..\..\YacaParser\libs\Targetix\Targetix.AdMira.Config.dll</HintPath>
-    </Reference>
-    <Reference Include="Targetix.Couchbase">
-      <HintPath>..\..\YacaParser\libs\Targetix\Targetix.Couchbase.dll</HintPath>
-    </Reference>
-    <Reference Include="Targetix.Exceptions">
-      <HintPath>..\..\YacaParser\libs\Targetix\Targetix.Exceptions.dll</HintPath>
-    </Reference>
     <Reference Include="Targetix.Helpers">
       <HintPath>..\..\YacaParser\libs\Targetix\Targetix.Helpers.dll</HintPath>
-    </Reference>
-    <Reference Include="Targetix.Model">
-      <HintPath>..\..\YacaParser\libs\Targetix\Targetix.Model.dll</HintPath>
     </Reference>
     <Reference Include="Targetix.MongoDB">
       <HintPath>..\..\YacaParser\libs\Targetix\Targetix.MongoDB.dll</HintPath>

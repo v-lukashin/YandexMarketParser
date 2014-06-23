@@ -207,6 +207,7 @@ namespace YandexMarketParser
                 _rep.Save(v);
             }
             Console.WriteLine("done");
+            log.Info("Saved {0} items. Visits {1}. Catalogs {2}. Time {3}min", val.Length, countVisitsOnPages, _catalogs.Count, sw.Elapsed.TotalMinutes);
         }
 
         void SaveState()
@@ -247,10 +248,19 @@ namespace YandexMarketParser
             while (true)
             {
                 string line = Console.ReadLine();
-                Console.Write("\t\t\t\t\t\t\t");
+                string shift = "\t\t\t\t\t\t\t"; 
+                Console.Write(shift);
                 int a, s;
                 switch (line)
                 {
+                    case "all":
+                        {
+                            Console.WriteLine("cnt = {0}", AllSites.Count);
+                            Console.WriteLine(shift+"Visits on pages {0}", countVisitsOnPages);
+                            Console.WriteLine(shift + "Catalogs left {0}", _catalogs.Where(x => x.Uri != null).Count());
+                            ThreadPool.GetAvailableThreads(out a, out s); Console.WriteLine(shift + "Available threads {0}/{1}", a, _poolSize);
+                            Console.WriteLine(shift + "Time working {0}min", sw.Elapsed.TotalMinutes); break;
+                        }
                     case "save": Saving(); break;
                     case "vis": Console.WriteLine("Visits on pages {0}", countVisitsOnPages); break;
                     case "cat": Console.WriteLine("Catalogs left {0}", _catalogs.Where(x=>x.Uri != null).Count()); break;

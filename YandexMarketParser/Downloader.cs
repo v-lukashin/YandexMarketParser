@@ -26,7 +26,7 @@ namespace YandexMarketParser
         private const string patternPrice = @"<span class=""b(?:-old)?-prices__num"">(?<price>[\s\d]*)</span>";
         private const string patternDescription = @"<p class=""b-offers__spec"">(?<desc>[\w\p{P}\p{S}\s]*?)(?:<span class=""b-more""><span class=""b-more__dots"">.</span><span class=""b-more__text"">(?<desc2>.*?)</span>.*?</span>)?</p>";
         private const string patternNext = @"<a class=""b-pager__next"" href=""(?<uri>[\w\p{P}\p{S}]*)"">[\w ]*</a>";
-        private const string patternCountGuru = @"<p>[\s]*выбрано.моделей[\s]*.+?(?<cnt>[\d]+)</p></div></form>";//к.о.с.т.ы.л.ь(начало)
+        //private const string patternCountGuru = @"<p>[\s]*выбрано.моделей[\s]*.+?(?<cnt>[\d]+)</p></div></form>";//к.о.с.т.ы.л.ь(начало)
 
         public Downloader(Catalog cat)
         {
@@ -49,7 +49,7 @@ namespace YandexMarketParser
 
         public void Processing()
         {
-            Console.WriteLine("Start : {0}", catName);
+            log.Info("Start : {0}", catName);
             do
             {
                 try
@@ -59,7 +59,6 @@ namespace YandexMarketParser
                     if (root == null)
                     {
                         log.Error("Ошибка. Страница не получена({0}).", _catalog.Uri);
-                        Console.WriteLine("Ошибка. Страница не получена({0}).", _catalog.Uri);
                         return;
                     }
 
@@ -112,11 +111,10 @@ namespace YandexMarketParser
                 catch (Exception exc)
                 {
                     log.Error("DownloaderError {0} : {1}", _catalog.Uri, exc);
-                    Console.WriteLine("#####DownloaderError##{0}", _catalog.Uri);
                 }
             } while (true);
             _catalog.Uri = null;
-            Console.WriteLine("Finish : {0}", catName);
+            log.Info("Finish : {0}", catName);
         }
 
         /// <summary>
