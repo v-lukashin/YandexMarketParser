@@ -26,6 +26,8 @@ namespace YandexMarketParser
         private const string patternPrice = @"<span class=""b(?:-old)?-prices__num"">(?<price>[\s\d]*)</span>";
         private const string patternDescription = @"<p class=""b-offers__spec"">(?<desc>[\w\p{P}\p{S}\s]*?)(?:<span class=""b-more""><span class=""b-more__dots"">.</span><span class=""b-more__text"">(?<desc2>.*?)</span>.*?</span>)?</p>";
         private const string patternNext = @"<a class=""b-pager__next"" href=""(?<uri>[\w\p{P}\p{S}]*)"">[\w ]*</a>";
+        private const string patternCount = @"<p class=""search-stat"">Все цены\s. (?<cnt>\d+)\.";
+
         //private const string patternCountGuru = @"<p>[\s]*выбрано.моделей[\s]*.+?(?<cnt>[\d]+)</p></div></form>";//к.о.с.т.ы.л.ь(начало)
 
         public Downloader(Catalog cat)
@@ -62,11 +64,61 @@ namespace YandexMarketParser
                         return;
                     }
 
+                    Regex regPrice = new Regex(patternPrice);
+
+                    #region -------------Обход ограничения повторяющихся ссылок после 50 страницы---------
+                    if (!_catalog.IsGuru)
+                    {
+                        Regex regCount = new Regex(patternCount);
+                        Match mCount = regCount.Match(root);
+                        if (mCount.Success && int.Parse(mCount.Groups["cnt"].Value) > 500)
+                        {
+                            _catalog.Uri = new Regex("catalog").Replace(_catalog.Uri, "search");
+                            MatchCollection mcPrice = regPrice.Matches(root);
+                            int totalPrice = 0;
+                            foreach (Match match in mcPrice)
+                            {
+                                totalPrice += int.Parse(new Regex(@"\s").Replace(match.Groups["price"].Value, ""));
+                            }
+                            int average = totalPrice / mcPrice.Count;
+                            //&mcpricefrom=
+                            Regex regMin = new Regex(@"(?<=&mcpricefrom=)\d+");
+                            Regex regMax = new Regex(@"(?<=&mcpriceto=)\d+");
+
+                            Match mMin = regMin.Match(_catalog.Uri);
+                            Match mMax = regMax.Match(_catalog.Uri);
+
+                            string tmpLink = _catalog.Uri;
+                            if (mMax.Success)
+                            {
+                                _catalog.Uri = regMax.Replace(_catalog.Uri, "" + average);
+                            }
+                            else
+                            {
+                                _catalog.Uri += "&mcpriceto=" + average;
+                            }
+
+                            if (mMin.Success)
+                            {
+                                tmpLink = regMin.Replace(tmpLink, "" + (average + 1));
+                            }
+                            else
+                            {
+                                tmpLink += "&mcpricefrom=" + (average + 1);
+                            }
+                            Catalog tmpCatalog = new Catalog(_catalog.Name, _catalog.Parent, tmpLink, _catalog.IsGuru);
+                            Spider.catalogs.Add(tmpCatalog);
+                            ThreadPool.QueueUserWorkItem(WaitCallback, tmpCatalog);
+
+                            continue;
+                        }
+                    }
+                    #endregion
+
                     Regex reg = new Regex(patternTitle);
                     MatchCollection matches = reg.Matches(root);
 
                     Regex regDescr = new Regex(patternDescription);
-                    Regex regPrice = new Regex(patternPrice);
                     int lastIndex = 0;
                     foreach (Match match in matches)
                     {
@@ -104,7 +156,14 @@ namespace YandexMarketParser
                     if (nextPage.Success)
                     {
                         _catalog.Uri = nextPage.Groups["uri"].Value;
-                        if (_catalog.IsGuru) _catalog.Uri = new Regex("amp;").Replace(_catalog.Uri, "");
+                        //if (_catalog.IsGuru) _catalog.Uri = new Regex("amp;").Replace(_catalog.Uri, "");
+                        _catalog.Uri = new Regex("amp;").Replace(_catalog.Uri, "");
+                        //если номер страницы больше 50, прерываем обработку(!guru). Т.к. дальше идут только повторения 
+                        //else if (int.Parse(new Regex(@"page=(\d+)").Match(_catalog.Uri).Groups[1].Value) > 50)
+                        //{
+                        //    log.Info("Limit 50 page : {0} : {1}. ", catName, _catalog.Uri);
+                        //    break;
+                        //}
                     }
                     else break;
                 }

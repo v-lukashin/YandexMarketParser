@@ -20,7 +20,7 @@ namespace YandexMarketParser
         public static Dictionary<string, YandexMarket> AllSites = new Dictionary<string, YandexMarket>(150000);//здесь хранится весь каталог
 
         public static long countVisitsOnPages = 0;//количество пройденых страниц
-        private List<Catalog> _catalogs;
+        public static List<Catalog> catalogs;
 
         private const int _poolSize = 100;
 
@@ -28,10 +28,10 @@ namespace YandexMarketParser
 
         Logger log = LogManager.GetCurrentClassLogger();
 
-        private readonly Catalog _rootCatalog = new Catalog { Name = "ROOT", Parent = "", IsGuru = false, Uri = "/catalog.xml" };
+        private readonly Catalog _rootCatalog = new Catalog ( "ROOT", "", "/catalog.xml", false );
 
         private readonly Repository _rep;
-        private const string _connectionString = "mongodb://localhost:27017/YandexMarket";
+        private const string _connectionString = "mongodb://localhost:27017/YandexMarket0624";
 
         private const string patternCatalog = @"<div class=""supcat(?<guru> guru)?""><a href=""(?<uri>/catalog.xml\?hid=\d*)"">(?:<img[\w\p{P}\p{S} ]*?>)?(?<name>[-\w,. ]*?)</a>";
         private const string patternAll = @"<a class=""top-3-models__title-link"" href=""(?<uri>[-\w\p{P}\p{S} ]*)"">Посмотреть все модели</a>";
@@ -40,7 +40,7 @@ namespace YandexMarketParser
         {
             ThreadPool.SetMaxThreads(_poolSize, _poolSize);
             _rep = new Repository(new Db(_connectionString));
-            _catalogs = new List<Catalog>();
+            catalogs = new List<Catalog>();
             Console.Write("Download from db...");
             var all = _rep.GetAll();
             foreach (var it in all)
@@ -88,7 +88,7 @@ namespace YandexMarketParser
                 else if (ans.Equals('n') || ans.Equals('н'))
                 {
                     Console.WriteLine("Значит начнем сначала");
-                    _catalogs = GetAllSheetCatalogs();
+                    catalogs = GetAllSheetCatalogs();
                     SaveState();
                     break;
                 }
@@ -97,7 +97,7 @@ namespace YandexMarketParser
 
             StartHelperTasks();
 
-            foreach (var catalog in _catalogs)//par?
+            foreach (var catalog in catalogs)//par?
             {
                 if (!string.IsNullOrEmpty(catalog.Uri)) ThreadPool.QueueUserWorkItem(Downloader.WaitCallback, catalog);
                 else Console.WriteLine("Найденый каталог равен null");
@@ -148,7 +148,7 @@ namespace YandexMarketParser
                         bool guru = match.Groups["guru"].Value == " guru";
 
                         //добавить в очередь
-                        queue.Enqueue(new Catalog { Uri = uri, Name = name, Parent = catalog.Parent + "/" + catalog.Name, IsGuru = guru });
+                        queue.Enqueue(new Catalog(name, catalog.Parent + "/" + catalog.Name, uri, guru));
 
                         Console.WriteLine("Найден каталог : {0} //href : {1}", name, uri);
                     }
@@ -207,7 +207,7 @@ namespace YandexMarketParser
                 _rep.Save(v);
             }
             Console.WriteLine("done");
-            log.Info("Saved {0} items. Visits {1}. Catalogs {2}. Time {3}min", val.Length, countVisitsOnPages, _catalogs.Count, sw.Elapsed.TotalMinutes);
+            log.Info("Saved {0} items. Visits {1}. Catalogs {2}. Time {3}min", val.Length, countVisitsOnPages, catalogs.Where(x => x.Uri != null).Count(), sw.Elapsed.TotalMinutes);
         }
 
         void SaveState()
@@ -215,7 +215,7 @@ namespace YandexMarketParser
             Console.Write("Saving state...");
             using (FileStream fs = new FileStream("Catalogs.txt", FileMode.Create))
             {
-                string jsonStr = JsonConvert.SerializeObject(_catalogs.ToArray());
+                string jsonStr = JsonConvert.SerializeObject(catalogs.ToArray());
                 byte[] res = System.Text.Encoding.UTF8.GetBytes(jsonStr);
                 fs.Write(res, 0, res.Length);
             }
@@ -229,8 +229,13 @@ namespace YandexMarketParser
             {
                 byte[] byteArr = new byte[fs.Length];
                 fs.Read(byteArr, 0, byteArr.Length);
-                Catalog[] res = JsonConvert.DeserializeObject<Catalog[]>(System.Text.Encoding.UTF8.GetString(byteArr)) ?? new Catalog[0];
-                _catalogs.AddRange(res);
+                Catalog[] res = JsonConvert.DeserializeObject<Catalog[]>(System.Text.Encoding.UTF8.GetString(byteArr));
+                if (res == null || res.Length == 0)
+                {
+                    Console.WriteLine("Коллекция пуста. Парсим заново.");
+                    res = GetAllSheetCatalogs().ToArray();
+                }
+                catalogs.AddRange(res);
             }
             Console.WriteLine("done");
         }
@@ -257,13 +262,13 @@ namespace YandexMarketParser
                         {
                             Console.WriteLine("cnt = {0}", AllSites.Count);
                             Console.WriteLine(shift+"Visits on pages {0}", countVisitsOnPages);
-                            Console.WriteLine(shift + "Catalogs left {0}", _catalogs.Where(x => x.Uri != null).Count());
+                            Console.WriteLine(shift + "Catalogs left {0}", catalogs.Where(x => x.Uri != null).Count());
                             ThreadPool.GetAvailableThreads(out a, out s); Console.WriteLine(shift + "Available threads {0}/{1}", a, _poolSize);
                             Console.WriteLine(shift + "Time working {0}min", sw.Elapsed.TotalMinutes); break;
                         }
                     case "save": Saving(); break;
                     case "vis": Console.WriteLine("Visits on pages {0}", countVisitsOnPages); break;
-                    case "cat": Console.WriteLine("Catalogs left {0}", _catalogs.Where(x=>x.Uri != null).Count()); break;
+                    case "cat": Console.WriteLine("Catalogs left {0}", catalogs.Where(x=>x.Uri != null).Count()); break;
                     case "pool": ThreadPool.GetAvailableThreads(out a, out s); Console.WriteLine("Available threads {0}/{1}", a, _poolSize); break;
                     case "time": Console.WriteLine("Time working {0}min", sw.Elapsed.TotalMinutes); break;
                     case "cnt":

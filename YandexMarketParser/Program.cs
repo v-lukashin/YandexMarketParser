@@ -14,9 +14,24 @@ namespace YandexMarketParser
     {
         static void Main(string[] args)
         {
+            //TestPageNum();
             //TestNext();
             //TestRegMarket();
             ParseYandexMarket();
+        }
+
+
+        static void TestPageNum()
+        {
+            string patternNext = @"<a class=""b-pager__next"" href=""(?<uri>[\w\p{P}\p{S}]*)"">[\w ]*</a>";
+            string root = Spider.DownloadPage("http://market.yandex.ru/search.xml?hid=90483&page=50");
+            Regex reg = new Regex(patternNext);
+            Match nextPage = reg.Match(root);
+
+            string catalog = nextPage.Groups["uri"].Value;
+            Match m = new Regex(@"page=(\d+)").Match(catalog);
+            bool res = int.Parse(m.Groups[1].Value) > 50;
+            Console.WriteLine(res);
         }
 
         static void TestNext()
@@ -26,7 +41,7 @@ namespace YandexMarketParser
             cli.Proxy = null;
             cli.Encoding = Encoding.UTF8;
             //string patternNext = @"<a class=""b-pager__next"" href=""(?<uri>[\w\p{P}\p{S}]*)"">[\w ]*</a>";
-            string patternNext  = @"<b class=""b-pager__current"">\d+</b> <a class=""b-pager__page"" data-mvc-page=""\d+"" href=""(?<uri>[\w\s\p{P}\p{S}]*?)"">\d+</a>";
+            string patternNext = @"<b class=""b-pager__current"">\d+</b> <a class=""b-pager__page"" data-mvc-page=""\d+"" href=""(?<uri>[\w\s\p{P}\p{S}]*?)"">\d+</a>";
             //string patternCount = @"<p>[\s]+выбрано&nbsp;моделей[\s]+&nbsp;— [\d]+</p></div></form>";
             string link = @"http://market.yandex.ru/guru.xml?CMD=-RR%3D0%2C0%2C0%2C0-VIS%3D8070-CAT_ID%3D8443229-EXC%3D1-PG%3D10&hid=90462";
             //string link = @"http://market.yandex.ru/guru.xml?CMD=-RR%3D0%2C0%2C0%2C0-VIS%3D8070-CAT_ID%3D975895-EXC%3D1-PG%3D10&hid=765280";
@@ -52,24 +67,24 @@ namespace YandexMarketParser
             //    fs.Write(barr, 0, barr.Length);
             //}
 
-//            string page = cli.DownloadString(link);
-//            //string patternCount = @"<p>[\w\s\p{P}\p{S}]+?(?<res>[\d]+)</p></div></form>";
-//            string patternCountGuru = @"<p>[\s]*выбрано.моделей[\s]*.+?(?<res>[\d]+)</p></div></form>";
+            //            string page = cli.DownloadString(link);
+            //            //string patternCount = @"<p>[\w\s\p{P}\p{S}]+?(?<res>[\d]+)</p></div></form>";
+            //            string patternCountGuru = @"<p>[\s]*выбрано.моделей[\s]*.+?(?<res>[\d]+)</p></div></form>";
 
-////            string page = @"</div></div><p>
-////                выбрано моделей
-////                 — 1111</p></div></form>
-////            </div>";
+            ////            string page = @"</div></div><p>
+            ////                выбрано моделей
+            ////                 — 1111</p></div></form>
+            ////            </div>";
 
-//            Regex rc = new Regex(patternCountGuru);
-//            Match match = rc.Match(page);
-//            Console.WriteLine(match.Groups["res"].Value);
+            //            Regex rc = new Regex(patternCountGuru);
+            //            Match match = rc.Match(page);
+            //            Console.WriteLine(match.Groups["res"].Value);
 
             string str = @"http://market.yandex.ru/guru.xml?hid=765280&CMD=-RR=0,0,0,0-VIS=8070-CAT_ID=975895-BPOS=40-EXC=1-PG=10&greed_mode=false";
 
             Regex rb = new Regex(@"(?<=-BPOS=)\d+");
             string urr = rb.Replace(str, "##");
-            
+
         }
 
         static void TestRegMarket()
@@ -79,7 +94,7 @@ namespace YandexMarketParser
             cli.Proxy = null;
             cli.Encoding = Encoding.UTF8;
 
-            string page = cli.DownloadString("http://market.yandex.ru/search.xml?hid=119744");
+            string page = cli.DownloadString("http://market.yandex.ru/search.xml?hid=90478");
 
             string patternCatalog = @"<div class=""supcat(?: guru)?""><a href=""(?<uri>/catalog.xml\?hid=\d*)"">(?:<img[\w\p{P}\p{S} ]*>)?(?<name>[-\w,. ]*)</a>";
             ///guru.xml?CMD=-RR%3D0%2C0%2C0%2C0-VIS%3D8070-CAT_ID%3D115828-EXC%3D1-PG%3D10&amp;hid=90565
@@ -89,7 +104,8 @@ namespace YandexMarketParser
             string patternNext = @"<a class=""b-pager__next"" href=""(?<uri>[\w\p{P}\p{S}]*)"">[\w ]*</a>";
             string patternDescription = @"<p class=""b-offers__spec"">(?<desc>[\w\p{P}\p{S}\s]*?)(?:<span class=""b-more""><span class=""b-more__dots"">.</span><span class=""b-more__text"">(?<desc2>.*?)</span>.*?</span>)?</p>";
             string patternTitle = @"<h3 class=""b-offers__title""><a (?:[-\w=""]*) class=""b-offers__name(?:.*?)"">(?<name>.*?)</a>";
-            Regex reg = new Regex(patternDescription);
+            string patternCount = @"<p class=""search-stat"">Все цены\s. (?<cnt>\d+)\.";
+            Regex reg = new Regex(patternCount);
 
             MatchCollection mc = reg.Matches(page);
             foreach (Match match in mc)
@@ -108,9 +124,13 @@ namespace YandexMarketParser
                 //int res = int.Parse(rr);
                 //Console.WriteLine("Price : {0}", res);
 
-                string desc = match.Groups["desc"].Value;
-                string desc2 = match.Groups["desc2"].Value;
-                Console.WriteLine("D1: \n{0}\nD2: \n{1}", desc, desc2);
+                //string desc = match.Groups["desc"].Value;
+                //string desc2 = match.Groups["desc2"].Value;
+                //Console.WriteLine("D1: \n{0}\nD2: \n{1}", desc, desc2);
+
+
+                string count = match.Groups["cnt"].Value;
+                Console.WriteLine(count);
             }
         }
 
