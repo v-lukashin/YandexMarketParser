@@ -27,6 +27,7 @@ namespace YandexMarketParser
         private const string patternDescription = @"<p class=""b-offers__spec"">(?<desc>[\w\p{P}\p{S}\s]*?)(?:<span class=""b-more""><span class=""b-more__dots"">.</span><span class=""b-more__text"">(?<desc2>.*?)</span>.*?</span>)?</p>";
         private const string patternNext = @"<a class=""b-pager__next"" href=""(?<uri>[\w\p{P}\p{S}]*)"">[\w ]*</a>";
         private const string patternCount = @"<p class=""search-stat"">Все цены\s. (?<cnt>\d+)\.";
+        private const string patternOi = @"<strong class=""b-head-name"">ой...</strong>";
 
         //private const string patternCountGuru = @"<p>[\s]*выбрано.моделей[\s]*.+?(?<cnt>[\d]+)</p></div></form>";//к.о.с.т.ы.л.ь(начало)
 
@@ -42,7 +43,6 @@ namespace YandexMarketParser
             cli.Proxy = null;
             cli.Encoding = Encoding.UTF8;
         }
-
         public static void WaitCallback(object state)
         {
             //StateOptions opt = (StateOptions)state;
@@ -63,17 +63,31 @@ namespace YandexMarketParser
                         log.Error("Ошибка. Страница не получена({0}).", _catalog.Uri);
                         return;
                     }
-
+                    if (new Regex(patternOi).Match(root).Success)
+                    {
+                        log.Info("Бежим, Джонни, нас спалили!!!");
+                        Thread.Sleep(600000);
+                        continue;
+                    }
                     Regex regPrice = new Regex(patternPrice);
-
+                    //Без этого обхода обработал 300к примерно. С ним появилась капча. Когда начал добавлять куки к запросу - забанили:( 
                     #region -------------Обход ограничения повторяющихся ссылок после 50 страницы---------
+                    //****************************************************************************************
+                    //*
+                    //*Разделяем задание на 2 части, если предметов боьше 500. Одна часть остается в этом потоке, вторая запускается в новом.
+                    //*Границу разделения определяем как среднее арифметическое всех цен данной страницы.
+                    //*
+                    //****************************************************************************************
                     if (!_catalog.IsGuru)
                     {
                         Regex regCount = new Regex(patternCount);
                         Match mCount = regCount.Match(root);
                         if (mCount.Success && int.Parse(mCount.Groups["cnt"].Value) > 500)
                         {
+                            //Заменяем, иначе выкинет на первую страницу без ограничения по ценам
                             _catalog.Uri = new Regex("catalog").Replace(_catalog.Uri, "search");
+
+                            //Считаем среднее арифметическое всех цен на данной странице
                             MatchCollection mcPrice = regPrice.Matches(root);
                             int totalPrice = 0;
                             foreach (Match match in mcPrice)
@@ -81,7 +95,7 @@ namespace YandexMarketParser
                                 totalPrice += int.Parse(new Regex(@"\s").Replace(match.Groups["price"].Value, ""));
                             }
                             int average = totalPrice / mcPrice.Count;
-                            //&mcpricefrom=
+
                             Regex regMin = new Regex(@"(?<=&mcpricefrom=)\d+");
                             Regex regMax = new Regex(@"(?<=&mcpriceto=)\d+");
 
@@ -89,6 +103,8 @@ namespace YandexMarketParser
                             Match mMax = regMax.Match(_catalog.Uri);
 
                             string tmpLink = _catalog.Uri;
+
+                            //Выставляем верхнее значение для текущей задачи
                             if (mMax.Success)
                             {
                                 _catalog.Uri = regMax.Replace(_catalog.Uri, "" + average);
@@ -98,6 +114,7 @@ namespace YandexMarketParser
                                 _catalog.Uri += "&mcpriceto=" + average;
                             }
 
+                            //Выставляем нижнее значение для новой задачи
                             if (mMin.Success)
                             {
                                 tmpLink = regMin.Replace(tmpLink, "" + (average + 1));
@@ -106,10 +123,13 @@ namespace YandexMarketParser
                             {
                                 tmpLink += "&mcpricefrom=" + (average + 1);
                             }
+
+                            //Запускаем новую задачу и добавляем каталог этой задачи ко всем очтальным
                             Catalog tmpCatalog = new Catalog(_catalog.Name, _catalog.Parent, tmpLink, _catalog.IsGuru);
                             Spider.catalogs.Add(tmpCatalog);
                             ThreadPool.QueueUserWorkItem(WaitCallback, tmpCatalog);
 
+                            //Продолжаем текущую задачу
                             continue;
                         }
                     }
@@ -122,16 +142,19 @@ namespace YandexMarketParser
                     int lastIndex = 0;
                     foreach (Match match in matches)
                     {
+                        //Парсим название
                         string name = match.Groups["name"].Value;
 
-                        if (!_cache.ContainsKey(name))
+                        if (!_cache.ContainsKey(name))//Если товара с таким именем не было
                         {
+                            //Парсим описание
                             string descr = "";
                             Match descrMatch = regDescr.Match(root, match.Index);
                             if (descrMatch.Success)
                             {
                                 descr = descrMatch.Groups["desc"].Value + descrMatch.Groups["desc2"].Value;//можно добавить костыль к кодом производителя
                             }
+                            //Парсим цену
                             int price = -1;
                             Match priceMatch = regPrice.Match(root, lastIndex, match.Index - lastIndex);
                             lastIndex = match.Index;
@@ -149,23 +172,16 @@ namespace YandexMarketParser
                     }
                     Spider.countVisitsOnPages++;
                     Console.Write(".");
-
+                    //Проверяем наличие следующей страницы
                     reg = new Regex(patternNext);
                     Match nextPage = reg.Match(root);
 
                     if (nextPage.Success)
                     {
                         _catalog.Uri = nextPage.Groups["uri"].Value;
-                        //if (_catalog.IsGuru) _catalog.Uri = new Regex("amp;").Replace(_catalog.Uri, "");
-                        _catalog.Uri = new Regex("amp;").Replace(_catalog.Uri, "");
-                        //если номер страницы больше 50, прерываем обработку(!guru). Т.к. дальше идут только повторения 
-                        //else if (int.Parse(new Regex(@"page=(\d+)").Match(_catalog.Uri).Groups[1].Value) > 50)
-                        //{
-                        //    log.Info("Limit 50 page : {0} : {1}. ", catName, _catalog.Uri);
-                        //    break;
-                        //}
+                        _catalog.Uri = new Regex("amp;").Replace(_catalog.Uri, "");//Удаляем, чтобы не перекидывало на первую страницу
                     }
-                    else break;
+                    else break;//Если не найдено завершаем работу
                 }
                 catch (Exception exc)
                 {

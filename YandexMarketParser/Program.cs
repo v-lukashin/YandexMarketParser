@@ -20,7 +20,6 @@ namespace YandexMarketParser
             ParseYandexMarket();
         }
 
-
         static void TestPageNum()
         {
             string patternNext = @"<a class=""b-pager__next"" href=""(?<uri>[\w\p{P}\p{S}]*)"">[\w ]*</a>";
@@ -105,7 +104,8 @@ namespace YandexMarketParser
             string patternDescription = @"<p class=""b-offers__spec"">(?<desc>[\w\p{P}\p{S}\s]*?)(?:<span class=""b-more""><span class=""b-more__dots"">.</span><span class=""b-more__text"">(?<desc2>.*?)</span>.*?</span>)?</p>";
             string patternTitle = @"<h3 class=""b-offers__title""><a (?:[-\w=""]*) class=""b-offers__name(?:.*?)"">(?<name>.*?)</a>";
             string patternCount = @"<p class=""search-stat"">Все цены\s. (?<cnt>\d+)\.";
-            Regex reg = new Regex(patternCount);
+            string patternOi = @"<strong class=""b-head-name"">ой...</strong>";
+            Regex reg = new Regex(patternOi);
 
             MatchCollection mc = reg.Matches(page);
             foreach (Match match in mc)

@@ -57,8 +57,6 @@ namespace YandexMarketParser
                 log.Info("Start processing");
 
                 Processing();
-
-                log.Info("Finish processing");
             }
             finally
             {
@@ -70,7 +68,7 @@ namespace YandexMarketParser
                     Thread.Sleep(10000);
                 }
                 Saving();
-                Console.WriteLine("Finish {0}\tTime worked {1}min\nPress any key to exit", DateTime.Now, sw.Elapsed.TotalMinutes);
+                Console.WriteLine("Finish processing. {0}\tTime worked {1}min\nPress any key to exit", DateTime.Now, sw.Elapsed.TotalMinutes);
                 Console.ReadKey();
             }
         }
