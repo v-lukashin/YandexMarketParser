@@ -170,7 +170,7 @@ namespace YandexMarketParser
             //Stopwatch sw = Stopwatch.StartNew();
             WebClient cli = new WebClient();
             cli.BaseAddress = "http://market.yandex.ru";
-            cli.Proxy = null;
+            cli.Proxy = new WebProxy(Downloader.Proxy);
             cli.Encoding = Encoding.UTF8;
 
             string page = null;

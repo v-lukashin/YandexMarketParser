@@ -31,7 +31,7 @@ namespace YandexMarketParser
         };
 
         private static int _currentProxyNumber = -1;
-        public string Proxy { get {
+        public static string Proxy { get {
             _currentProxyNumber++;
             _currentProxyNumber %= _proxy.Length;
             return _proxy[_currentProxyNumber]; 
