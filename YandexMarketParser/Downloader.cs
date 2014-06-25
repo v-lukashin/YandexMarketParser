@@ -4,6 +4,8 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Net;
+using System.Net.Security;
+using System.Security.Cryptography.X509Certificates;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading;
@@ -19,6 +21,21 @@ namespace YandexMarketParser
         private Catalog _catalog;
         private string catName;
         private readonly Dictionary<string, YandexMarket> _cache;
+        private static readonly string[] _proxy = new string[] { "http://77.43.143.31:3128", "http://77.50.220.92:8080", "http://31.28.23.219:8118", "http://109.172.51.147:80",
+            "http://62.176.28.41:8088","http://176.194.189.56:8080","http://195.62.78.1:3128","http://31.28.6.13:8118","http://94.228.205.33:8080", "http://62.176.13.22:8088", //Россия
+        "http://93.181.161.198:8080",//Польша
+        "http://79.135.207.34:8080",//Украина
+        "http://212.69.8.2:8080",//Сербия
+        "http://118.69.205.202:4624",//Вьетнам
+        "http://178.33.249.19:80", "http://93.184.33.166:8080"//Франция
+        };
+
+        private static int _currentProxyNumber = -1;
+        public string Proxy { get {
+            _currentProxyNumber++;
+            _currentProxyNumber %= _proxy.Length;
+            return _proxy[_currentProxyNumber]; 
+        } }
 
         private readonly WebClient cli;
 
@@ -40,7 +57,7 @@ namespace YandexMarketParser
 
             cli = new WebClient();
             cli.BaseAddress = "http://market.yandex.ru";
-            cli.Proxy = null;
+            cli.Proxy = new WebProxy("http://62.176.13.22:8088");
             cli.Encoding = Encoding.UTF8;
         }
         public static void WaitCallback(object state)
@@ -70,6 +87,7 @@ namespace YandexMarketParser
                         continue;
                     }
                     Regex regPrice = new Regex(patternPrice);
+#if all
                     //Без этого обхода обработал 300к примерно. С ним появилась капча. Когда начал добавлять куки к запросу - забанили:( 
                     #region -------------Обход ограничения повторяющихся ссылок после 50 страницы---------
                     //****************************************************************************************
@@ -134,7 +152,7 @@ namespace YandexMarketParser
                         }
                     }
                     #endregion
-
+#endif
                     Regex reg = new Regex(patternTitle);
                     MatchCollection matches = reg.Matches(root);
 
@@ -216,5 +234,14 @@ namespace YandexMarketParser
             }
             return page;
         }
+
+//        public static bool ValidateServerCertificate(
+//object sender,
+//X509Certificate certificate,
+//X509Chain chain,
+//SslPolicyErrors sslPolicyErrors)
+//        {
+//            return true;
+//        }
     }
 }

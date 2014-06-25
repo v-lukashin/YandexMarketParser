@@ -22,7 +22,7 @@ namespace YandexMarketParser
         public static long countVisitsOnPages = 0;//количество пройденых страниц
         public static List<Catalog> catalogs;
 
-        private const int _poolSize = 100;
+        private const int _poolSize = 20;
 
         private Stopwatch sw;
 
@@ -31,7 +31,7 @@ namespace YandexMarketParser
         private readonly Catalog _rootCatalog = new Catalog ( "ROOT", "", "/catalog.xml", false );
 
         private readonly Repository _rep;
-        private const string _connectionString = "mongodb://localhost:27017/YandexMarket0624";
+        private const string _connectionString = "mongodb://localhost:27017/YandexMarket0625";
 
         private const string patternCatalog = @"<div class=""supcat(?<guru> guru)?""><a href=""(?<uri>/catalog.xml\?hid=\d*)"">(?:<img[\w\p{P}\p{S} ]*?>)?(?<name>[-\w,. ]*?)</a>";
         private const string patternAll = @"<a class=""top-3-models__title-link"" href=""(?<uri>[-\w\p{P}\p{S} ]*)"">Посмотреть все модели</a>";
@@ -78,12 +78,12 @@ namespace YandexMarketParser
             {
                 Console.WriteLine("Восстановить предыдущее состояние?(y/n):");
                 char ans = Console.ReadKey().KeyChar;
-                if (ans.Equals('y') || ans.Equals('д'))
+                if (ans.Equals('y') || ans.Equals('Y'))
                 {
                     ReadState();
                     break;
                 }
-                else if (ans.Equals('n') || ans.Equals('н'))
+                else if (ans.Equals('n') || ans.Equals('N'))
                 {
                     Console.WriteLine("Значит начнем сначала");
                     catalogs = GetAllSheetCatalogs();
@@ -97,8 +97,8 @@ namespace YandexMarketParser
 
             foreach (var catalog in catalogs)//par?
             {
-                if (!string.IsNullOrEmpty(catalog.Uri)) ThreadPool.QueueUserWorkItem(Downloader.WaitCallback, catalog);
-                else Console.WriteLine("Найденый каталог равен null");
+                if (!string.IsNullOrEmpty(catalog.Uri) && catalog.IsGuru) ThreadPool.QueueUserWorkItem(Downloader.WaitCallback, catalog);//обкачиваем только гуру
+                else Console.WriteLine("Найденый каталог равен null или негуризованный");
             }
         }
         /// <summary>
