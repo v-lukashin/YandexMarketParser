@@ -69,7 +69,7 @@ namespace YandexMarketParser
                 }
                 Saving();
                 Console.WriteLine("Finish processing. {0}\tTime worked {1}min\nPress any key to exit", DateTime.Now, sw.Elapsed.TotalMinutes);
-                Console.ReadKey();
+                //Console.ReadKey();
             }
         }
         void Processing()
@@ -97,8 +97,8 @@ namespace YandexMarketParser
 
             foreach (var catalog in catalogs)//par?
             {
-                if (!string.IsNullOrEmpty(catalog.Uri) && catalog.IsGuru) ThreadPool.QueueUserWorkItem(Downloader.WaitCallback, catalog);//обкачиваем только гуру
-                else Console.WriteLine("Найденый каталог равен null или негуризованный");
+                if (!catalog.Complited) ThreadPool.QueueUserWorkItem(Downloader.WaitCallback, catalog);//обкачиваем только гуру
+                else Console.WriteLine("Обкачка данного каталога завершена");
             }
         }
         /// <summary>
@@ -205,7 +205,7 @@ namespace YandexMarketParser
                 _rep.Save(v);
             }
             Console.WriteLine("done");
-            log.Info("Saved {0} items. Visits {1}. Catalogs {2}. Time {3}min", val.Length, countVisitsOnPages, catalogs.Where(x => x.Uri != null).Count(), sw.Elapsed.TotalMinutes);
+            log.Info("Saved {0} items. Visits {1}. Catalogs {2}. Time {3}min", val.Length, countVisitsOnPages, catalogs.Where(x => x.Complited == false).Count(), sw.Elapsed.TotalMinutes);
         }
 
         void SaveState()
@@ -260,13 +260,13 @@ namespace YandexMarketParser
                         {
                             Console.WriteLine("cnt = {0}", AllSites.Count);
                             Console.WriteLine(shift+"Visits on pages {0}", countVisitsOnPages);
-                            Console.WriteLine(shift + "Catalogs left {0}", catalogs.Where(x => x.Uri != null).Count());
+                            Console.WriteLine(shift + "Catalogs left {0}", catalogs.Where(x => x.Complited == false).Count());
                             ThreadPool.GetAvailableThreads(out a, out s); Console.WriteLine(shift + "Available threads {0}/{1}", a, _poolSize);
                             Console.WriteLine(shift + "Time working {0}min", sw.Elapsed.TotalMinutes); break;
                         }
                     case "save": Saving(); break;
                     case "vis": Console.WriteLine("Visits on pages {0}", countVisitsOnPages); break;
-                    case "cat": Console.WriteLine("Catalogs left {0}", catalogs.Where(x=>x.Uri != null).Count()); break;
+                    case "cat": Console.WriteLine("Catalogs left {0}", catalogs.Where(x=>x.Complited == false).Count()); break;
                     case "pool": ThreadPool.GetAvailableThreads(out a, out s); Console.WriteLine("Available threads {0}/{1}", a, _poolSize); break;
                     case "time": Console.WriteLine("Time working {0}min", sw.Elapsed.TotalMinutes); break;
                     case "cnt":

@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Newtonsoft.Json;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -14,12 +15,28 @@ namespace YandexMarketParser
     {
         static void Main(string[] args)
         {
+            //ReconstructCatalogs();
             //TestPageNum();
             //TestNext();
             //TestRegMarket();
             ParseYandexMarket();
         }
 
+        static void ReconstructCatalogs()
+        {
+            Catalog[] source = ReadState("sourceCat.txt");
+            Catalog[] forReconstruct = ReadState("destinationCat.txt");
+            foreach (var cat in source)
+            {
+                Catalog dest = forReconstruct.First(x => x.Name == cat.Name);
+                if (dest.Uri == null)
+                {
+                    dest.Uri = cat.Uri;
+                    dest.Complited = true;
+                }
+            }
+            SaveState("resultCat.txt", forReconstruct);
+        }
         static void TestPageNum()
         {
             string patternNext = @"<a class=""b-pager__next"" href=""(?<uri>[\w\p{P}\p{S}]*)"">[\w ]*</a>";
@@ -132,6 +149,31 @@ namespace YandexMarketParser
                 string count = match.Groups["cnt"].Value;
                 Console.WriteLine(count);
             }
+        }
+        static void SaveState(string fileName, Catalog[] catalogs)
+        {
+            Console.Write("Saving state...");
+            using (FileStream fs = new FileStream(fileName, FileMode.Create))
+            {
+                string jsonStr = JsonConvert.SerializeObject(catalogs.ToArray());
+                byte[] res = System.Text.Encoding.UTF8.GetBytes(jsonStr);
+                fs.Write(res, 0, res.Length);
+            }
+            Console.WriteLine("done");
+        }
+
+        static Catalog[] ReadState(string fileName)
+        {
+            Console.Write("Reading state...");
+            Catalog[] res = null;
+            using (FileStream fs = new FileStream(fileName, FileMode.OpenOrCreate))
+            {
+                byte[] byteArr = new byte[fs.Length];
+                fs.Read(byteArr, 0, byteArr.Length);
+                res = JsonConvert.DeserializeObject<Catalog[]>(System.Text.Encoding.UTF8.GetString(byteArr)) ?? new Catalog[0];
+            }
+            Console.WriteLine("done");
+            return res;
         }
 
         static void ParseYandexMarket()

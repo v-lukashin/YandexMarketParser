@@ -19,5 +19,6 @@ namespace YandexMarketParser.Models
         public string Name { get; set; }
         public string Parent { get; set; }
         public bool IsGuru { get; set; }
+        public bool Complited { get; set; }
     }
 }
