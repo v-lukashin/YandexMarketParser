@@ -1,4 +1,5 @@
-﻿using NLog;
+﻿using Newtonsoft.Json;
+using NLog;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -15,7 +16,8 @@ namespace YandexMarketParser
 {
     class Downloader
     {
-        Logger log = LogManager.GetCurrentClassLogger();
+        #region -------------------Поля/конструкторы-----------------------
+        private static Logger log = LogManager.GetCurrentClassLogger();
 
         private Catalog _catalog;
         private string catName;
@@ -23,47 +25,20 @@ namespace YandexMarketParser
         private bool _checkCount;
 
 
-        private static readonly string[] _proxyList = new string[] {"http://109.172.51.147:80", "http://31.28.23.219:8118", "http://188.191.80.8:8080", 
-            "http://213.87.117.2:80", "http://31.28.6.13:8118", "http://83.174.218.40:8080", "http://62.231.187.137:8080", //Россия 
-            "http://195.112.225.218:8080", "http://80.240.129.91:80", "http://194.85.142.120:8888", "http://212.33.244.18:80", "http://188.134.91.99:3128",
+        public static readonly string[] _proxyList;
+        //= new string[] {"http://31.28.6.13:8118", "http://31.28.23.219:8118", "http://62.176.28.73:8088", 
+        //    "http://62.176.29.1:8088", "http://62.231.187.137:8080", "http://80.240.129.91:80", "http://81.30.210.118:8080", "http://82.151.120.169:8080", 
+        //    "http://83.174.218.40:8080", "http://85.235.189.38:8118", "http://88.86.218.69:3128", "http://89.148.232.109:3128", "http://92.124.137.77:3128", 
+        //    "http://92.246.205.25:8080", "http://94.41.108.38:3128", "http://109.172.51.147:80", "http://176.192.42.230:80", "http://176.197.229.190:3128", 
+        //    "http://178.33.249.19:80", "http://188.64.221.200:8080", "http://188.130.128.243:80", "http://188.134.91.99:3128","http://188.191.80.8:8080", 
+        //    "http://194.85.142.120:8888", "http://195.112.225.218:8080", "http://212.3.153.25:3128", "http://212.33.244.18:80", "http://212.220.204.20:8080", 
+        //    "http://213.87.117.2:80", "http://217.119.18.106:8080"
+        //};
 
-            "http://178.33.249.19:80"//Франция
-        };
-        //static Semaphore[] sem;
-        //"http://77.50.220.92:8080", "http://77.43.143.31:3128","http://176.194.189.56:8080","http://195.62.78.1:3128", "http://91.188.177.14:8080","http://62.176.28.41:8088", 
-        //"http://109.172.51.106:8080","http://212.33.239.68:3128","http://78.109.137.225:3128", "http://91.194.247.247:8080",  
-        //"http://62.176.13.22:8088", 
-        //"http://79.135.207.34:8080",//Украина
-        //"http://93.181.161.198:8080",//Польша
-        //"http://212.69.8.2:8080",//Сербия
-        //"http://118.69.205.202:4624",//Вьетнам
-        //,"http://93.184.33.166:8080" //Франция
-
-        private static int[] _countPerProxy = new int[_proxyList.Length];
-        private const int _limitPerProxy = 2;
-        private static int _proxyIndex = -1;
-        private static string Proxy
-        {
-            get
-            {
-                int counter = 0;
-                do
-                {
-                    if (counter++ > _proxyList.Length)
-                    {
-                        counter = 0;
-                        Console.WriteLine("Не могу подобрать прокси. Возможно количество процессов больше чем {0}*{1}", _proxyList.Length, _limitPerProxy);
-                        Thread.Sleep(60000);
-                    }
-                    _proxyIndex++;
-                    _proxyIndex %= _proxyList.Length;
-                } while (_countPerProxy[_proxyIndex] >= _limitPerProxy);
-
-                _countPerProxy[_proxyIndex]++;
-                return _proxyList[_proxyIndex];
-            }
-        }
-
+        private static int[] _countPerProxy;
+        private const int _limitPerProxy = 2;//чем больше, тем выше шанс выдать себя
+        private static int _proxyIndex;
+        
         private WebProxy _prx;
         private readonly WebClient cli;
 
@@ -73,6 +48,13 @@ namespace YandexMarketParser
         private const string patternNext = @"<a class=""b-pager__next"" href=""(?<uri>[\w\p{P}\p{S}]*)"">[\w ]*</a>";
         private const string patternCount = @"<p class=""search-stat"">Все цены\s. (?<cnt>\d+)\.";
         private const string patternOi = @"<strong class=""b-head-name"">ой...</strong>";
+
+        static Downloader()
+        {
+            _proxyList = ReadProxyList();
+            _countPerProxy = new int[_proxyList.Length];
+            _proxyIndex = -1;
+        }
 
         public Downloader(Catalog cat, WebProxy prx)
         {
@@ -87,6 +69,7 @@ namespace YandexMarketParser
             cli.Proxy = _prx;
             cli.Encoding = Encoding.UTF8;
         }
+        #endregion
         public static void WaitCallback(object state)
         {
             WebProxy proxy = new WebProxy(Proxy);
@@ -228,6 +211,7 @@ namespace YandexMarketParser
             //_countPerProxy[_currentProxyIndex]--;
             log.Info("Finish : {0}", catName);
         }
+        #region -----------------Вспомогательные методы----------------------
 
         /// <summary>
         /// 10 попыток получить страницу. Если null, значит получить не удалось
@@ -253,6 +237,27 @@ namespace YandexMarketParser
             }
             return page;
         }
+        private static string Proxy
+        {
+            get
+            {
+                int counter = 0;
+                do
+                {
+                    if (counter++ > _proxyList.Length)
+                    {
+                        counter = 0;
+                        Console.WriteLine("Не могу подобрать прокси. Возможно количество процессов больше чем {0}*{1}", _proxyList.Length, _limitPerProxy);
+                        Thread.Sleep(60000);
+                    }
+                    _proxyIndex++;
+                    _proxyIndex %= _proxyList.Length;
+                } while (_countPerProxy[_proxyIndex] >= _limitPerProxy);
+
+                _countPerProxy[_proxyIndex]++;
+                return _proxyList[_proxyIndex];
+            }
+        }
 
         public static string UsedProxies(){
             string res = "[";
@@ -263,5 +268,24 @@ namespace YandexMarketParser
             res += "]";
             return res;
         }
+
+        private static string[] ReadProxyList()
+        {
+            string[] result;
+            using (FileStream fs = new FileStream("Proxies.txt", FileMode.OpenOrCreate))
+            {
+                byte[] b = new byte[fs.Length];
+                fs.Read(b, 0, b.Length);
+                string jsonStr = Encoding.UTF8.GetString(b);
+                result = JsonConvert.DeserializeObject<string[]>(jsonStr);
+                if (result == null || !result.Any())
+                {
+                    log.Fatal("Список прокси-серверов пуст");
+                    Environment.Exit(0);
+                }
+            }
+            return result;
+        }
+        #endregion
     }
 }

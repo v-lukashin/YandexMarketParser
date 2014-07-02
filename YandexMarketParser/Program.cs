@@ -22,6 +22,27 @@ namespace YandexMarketParser
             //TestRegMarket();
             ParseYandexMarket();
         }
+        static string[] ReadProxyList()
+        {
+            string[] result;
+            using (FileStream fs = new FileStream("Proxies.txt",FileMode.Open))
+            {
+                byte[] b = new byte[fs.Length];
+                fs.Read(b, 0, b.Length);
+                string jsonStr = Encoding.UTF8.GetString(b);
+                result = JsonConvert.DeserializeObject<string[]>(jsonStr);
+            }
+            return result;
+        }
+        static void SaveProxyList(string [] prx)
+        {
+            using (FileStream fs = new FileStream("Proxies.txt", FileMode.Create))
+            {
+                string jsonStr = JsonConvert.SerializeObject(prx);
+                byte[] b = Encoding.UTF8.GetBytes(jsonStr);
+                fs.Write(b, 0, b.Length);
+            }
+        }
         static void MergeMarket(){
             Repository rep1 = new Repository(new Db("mongodb://localhost:27017/YandexMarket"));
             Repository repRes = new Repository(new Db("mongodb://localhost:27017/YandexMarketCompiled"));
