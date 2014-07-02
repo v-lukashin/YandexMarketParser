@@ -15,11 +15,35 @@ namespace YandexMarketParser
     {
         static void Main(string[] args)
         {
+            //RemoveNull();
             //ReconstructCatalogs();
             //TestPageNum();
             //TestNext();
             //TestRegMarket();
             ParseYandexMarket();
+        }
+        static void MergeMarket(){
+            Repository rep1 = new Repository(new Db("mongodb://localhost:27017/YandexMarket"));
+            Repository repRes = new Repository(new Db("mongodb://localhost:27017/YandexMarketCompiled"));
+
+            IEnumerable<YandexMarket> all = rep1.GetAll();
+            foreach (var item in all)
+            {
+                repRes.Save(item);
+            }
+            Console.WriteLine("Rep1 complited");
+        }
+
+        static void RemoveNull()
+        {
+            Catalog[] cat = ReadState("Catalogs22.txt");
+            List<Catalog> res = new List<Catalog>();
+            foreach (var c in cat)
+            {
+                if (!(c.Uri.IndexOf("mcpriceto=0", 0) > 0)) res.Add(c);
+                else Console.WriteLine();
+            }
+            SaveState("SaveCat.txt", res.ToArray());
         }
 
         static void ReconstructCatalogs()

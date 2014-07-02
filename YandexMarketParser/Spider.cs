@@ -31,7 +31,7 @@ namespace YandexMarketParser
         private readonly Catalog _rootCatalog = new Catalog ( "ROOT", "", "/catalog.xml", false );
 
         private readonly Repository _rep;
-        private const string _connectionString = "mongodb://localhost:27017/YandexMarket0625";
+        private const string _connectionString = "mongodb://localhost:27017/YandexMarket0630";
 
         private const string patternCatalog = @"<div class=""supcat(?<guru> guru)?""><a href=""(?<uri>/catalog.xml\?hid=\d*)"">(?:<img[\w\p{P}\p{S} ]*?>)?(?<name>[-\w,. ]*?)</a>";
         private const string patternAll = @"<a class=""top-3-models__title-link"" href=""(?<uri>[-\w\p{P}\p{S} ]*)"">Посмотреть все модели</a>";
@@ -95,11 +95,12 @@ namespace YandexMarketParser
 
             StartHelperTasks();
 
-            foreach (var catalog in catalogs)//par?
+            foreach (var catalog in catalogs.ToArray())//
             {
-                if (!catalog.Complited) ThreadPool.QueueUserWorkItem(Downloader.WaitCallback, catalog);//обкачиваем только гуру
-                else Console.WriteLine("Обкачка данного каталога завершена");
+                if (!catalog.Complited) ThreadPool.QueueUserWorkItem(Downloader.WaitCallback, catalog);
+                else Console.WriteLine("Обкачка данного каталога уже завершена");
             }
+            
         }
         /// <summary>
         /// Находит все листовые каталоги
@@ -170,7 +171,7 @@ namespace YandexMarketParser
             //Stopwatch sw = Stopwatch.StartNew();
             WebClient cli = new WebClient();
             cli.BaseAddress = "http://market.yandex.ru";
-            cli.Proxy = new WebProxy(Downloader.Proxy);
+            cli.Proxy = null;
             cli.Encoding = Encoding.UTF8;
 
             string page = null;
@@ -245,13 +246,23 @@ namespace YandexMarketParser
             Task saver = new Task(() => { while (true) { Thread.Sleep(600000); Saving(); } });
             saver.Start();
         }
+        void DeleteComplitedCatalogs()
+        {
+            Console.Write("Delete all comlited...");
+            var comlited = catalogs.Where(x => x.Complited == true).ToArray();
+            foreach (var it in comlited)
+            {
+                catalogs.Remove(it);
+            }
+            Console.WriteLine("done");
+        }
 
         void ConsoleComand()
         {
             while (true)
             {
                 string line = Console.ReadLine();
-                string shift = "\t\t\t\t\t\t\t"; 
+                string shift = "\t\t\t\t\t"; 
                 Console.Write(shift);
                 int a, s;
                 switch (line)
@@ -262,13 +273,16 @@ namespace YandexMarketParser
                             Console.WriteLine(shift+"Visits on pages {0}", countVisitsOnPages);
                             Console.WriteLine(shift + "Catalogs left {0}", catalogs.Where(x => x.Complited == false).Count());
                             ThreadPool.GetAvailableThreads(out a, out s); Console.WriteLine(shift + "Available threads {0}/{1}", a, _poolSize);
-                            Console.WriteLine(shift + "Time working {0}min", sw.Elapsed.TotalMinutes); break;
+                            Console.WriteLine(shift + "Time working {0:f4}min", sw.Elapsed.TotalMinutes);
+                            Console.Write(shift + "Count per proxy : "+ Downloader.UsedProxies());
+                            break;
                         }
+                    case "gc": DeleteComplitedCatalogs(); break;
                     case "save": Saving(); break;
                     case "vis": Console.WriteLine("Visits on pages {0}", countVisitsOnPages); break;
                     case "cat": Console.WriteLine("Catalogs left {0}", catalogs.Where(x=>x.Complited == false).Count()); break;
                     case "pool": ThreadPool.GetAvailableThreads(out a, out s); Console.WriteLine("Available threads {0}/{1}", a, _poolSize); break;
-                    case "time": Console.WriteLine("Time working {0}min", sw.Elapsed.TotalMinutes); break;
+                    case "time": Console.WriteLine("Time working {0:f4}min", sw.Elapsed.TotalMinutes); break;
                     case "cnt":
                     default: Console.WriteLine("cnt = {0}", AllSites.Count); break;
                 }

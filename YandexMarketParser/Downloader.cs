@@ -5,7 +5,6 @@ using System.IO;
 using System.Linq;
 using System.Net;
 using System.Net.Security;
-using System.Security.Cryptography.X509Certificates;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading;
@@ -21,24 +20,51 @@ namespace YandexMarketParser
         private Catalog _catalog;
         private string catName;
         private readonly Dictionary<string, YandexMarket> _cache;
-        private bool _countItemsOK; //Укладывается ли количество предметов в ограничение
-        private static readonly string[] _proxy = new string[] { "http://77.43.143.31:3128", "http://77.50.220.92:8080", "http://109.172.51.147:80", "http://31.28.23.219:8118",
-            "http://62.176.28.41:8088","http://176.194.189.56:8080","http://195.62.78.1:3128","http://31.28.6.13:8118","http://94.228.205.33:8080", "http://62.176.13.22:8088", //Россия
-        "http://93.181.161.198:8080",//Польша
-        "http://79.135.207.34:8080",//Украина
+        private bool _checkCount;
+
+
+        private static readonly string[] _proxyList = new string[] {"http://109.172.51.147:80", "http://31.28.23.219:8118", "http://188.191.80.8:8080", 
+            "http://213.87.117.2:80", "http://31.28.6.13:8118", "http://83.174.218.40:8080", "http://62.231.187.137:8080", //Россия 
+            "http://195.112.225.218:8080", "http://80.240.129.91:80", "http://194.85.142.120:8888", "http://212.33.244.18:80", "http://188.134.91.99:3128",
+
+            "http://178.33.249.19:80"//Франция
+        };
+        //static Semaphore[] sem;
+        //"http://77.50.220.92:8080", "http://77.43.143.31:3128","http://176.194.189.56:8080","http://195.62.78.1:3128", "http://91.188.177.14:8080","http://62.176.28.41:8088", 
+        //"http://109.172.51.106:8080","http://212.33.239.68:3128","http://78.109.137.225:3128", "http://91.194.247.247:8080",  
+        //"http://62.176.13.22:8088", 
+        //"http://79.135.207.34:8080",//Украина
+        //"http://93.181.161.198:8080",//Польша
         //"http://212.69.8.2:8080",//Сербия
         //"http://118.69.205.202:4624",//Вьетнам
-        "http://178.33.249.19:80"//, "http://93.184.33.166:8080"//Франция
-        };
+        //,"http://93.184.33.166:8080" //Франция
 
-        private static int _currentProxyNumber = -1;
-        public static string Proxy { get {
-            _currentProxyNumber++;
-            _currentProxyNumber %= _proxy.Length;
-            return _proxy[_currentProxyNumber]; 
-        } }
+        private static int[] _countPerProxy = new int[_proxyList.Length];
+        private const int _limitPerProxy = 2;
+        private static int _proxyIndex = -1;
+        private static string Proxy
+        {
+            get
+            {
+                int counter = 0;
+                do
+                {
+                    if (counter++ > _proxyList.Length)
+                    {
+                        counter = 0;
+                        Console.WriteLine("Не могу подобрать прокси. Возможно количество процессов больше чем {0}*{1}", _proxyList.Length, _limitPerProxy);
+                        Thread.Sleep(60000);
+                    }
+                    _proxyIndex++;
+                    _proxyIndex %= _proxyList.Length;
+                } while (_countPerProxy[_proxyIndex] >= _limitPerProxy);
 
-        WebProxy prx;
+                _countPerProxy[_proxyIndex]++;
+                return _proxyList[_proxyIndex];
+            }
+        }
+
+        private WebProxy _prx;
         private readonly WebClient cli;
 
         private const string patternTitle = @"<h3 class=""b-offers__title""><a (?:[-\w=""]*) class=""b-offers__name(?:.*?)"">(?<name>.*?)</a>";
@@ -47,27 +73,29 @@ namespace YandexMarketParser
         private const string patternNext = @"<a class=""b-pager__next"" href=""(?<uri>[\w\p{P}\p{S}]*)"">[\w ]*</a>";
         private const string patternCount = @"<p class=""search-stat"">Все цены\s. (?<cnt>\d+)\.";
         private const string patternOi = @"<strong class=""b-head-name"">ой...</strong>";
-        
-        public Downloader(Catalog cat)
+
+        public Downloader(Catalog cat, WebProxy prx)
         {
             _catalog = cat;
             catName = _catalog.Name;
-            //_link = cat.Uri;
+            _checkCount = true;
             _cache = Spider.AllSites;
 
             cli = new WebClient();
             cli.BaseAddress = "http://market.yandex.ru";
-            //cli.Proxy = new WebProxy("http://62.176.13.22:8088");
-            prx = new WebProxy(Proxy);
-            cli.Proxy = prx;
+            _prx = prx;
+            cli.Proxy = _prx;
             cli.Encoding = Encoding.UTF8;
         }
         public static void WaitCallback(object state)
         {
-            new Downloader((Catalog)state).Processing();
+            WebProxy proxy = new WebProxy(Proxy);
+            int index = _proxyIndex;
+            new Downloader((Catalog)state, proxy).Processing();
+            _countPerProxy[index]--;
         }
 
-        public void Processing()
+        private void Processing()
         {
             log.Info("Start : {0}", catName);
             do
@@ -78,12 +106,12 @@ namespace YandexMarketParser
 
                     if (root == null)
                     {
-                        log.Error("Ошибка. Страница не получена({0}).\nProxy : {1}", _catalog.Uri, prx.Address);
+                        log.Error("Ошибка. Страница не получена({0}).\nProxy : {1}", _catalog.Uri, _prx.Address);
                         return;
                     }
                     if (new Regex(patternOi).Match(root).Success)
                     {
-                        log.Info("Бежим, Джонни, нас спалили!!!");
+                        log.Info("Бежим, Джони! Нас спалили!!! Proxy : {0}", _prx.Address);
                         Thread.Sleep(600000);
                         continue;
                     }
@@ -97,61 +125,45 @@ namespace YandexMarketParser
                     //*Границу разделения определяем как среднее арифметическое всех цен данной страницы.
                     //*
                     //****************************************************************************************
-                    if (_countItemsOK || !_catalog.IsGuru)
+                    if (_checkCount && !_catalog.IsGuru)
                     {
                         Regex regCount = new Regex(patternCount);
                         Match mCount = regCount.Match(root);
                         if (mCount.Success && int.Parse(mCount.Groups["cnt"].Value) > 500)
                         {
+                            Console.Write(",");
                             //Заменяем, иначе выкинет на первую страницу без ограничения по ценам
-                            _catalog.Uri = new Regex("catalog").Replace(_catalog.Uri, "search");
-
-                            //Считаем среднее арифметическое всех цен на данной странице
-                            MatchCollection mcPrice = regPrice.Matches(root);
-                            int totalPrice = 0;
-                            foreach (Match match in mcPrice)
-                            {
-                                totalPrice += int.Parse(new Regex(@"\s").Replace(match.Groups["price"].Value, ""));
-                            }
-                            int average = totalPrice / mcPrice.Count;
+                            _catalog.Uri = _catalog.Uri.Replace("catalog", "search");
 
                             Regex regMin = new Regex(@"(?<=&mcpricefrom=)\d+");
                             Regex regMax = new Regex(@"(?<=&mcpriceto=)\d+");
 
-                            Match mMin = regMin.Match(_catalog.Uri);
-                            Match mMax = regMax.Match(_catalog.Uri);
+                            if (!regMin.Match(_catalog.Uri).Success) _catalog.Uri += "&mcpricefrom=0";
+                            if (!regMax.Match(_catalog.Uri).Success) _catalog.Uri += "&mcpriceto=15000000";
+
+                            int max = int.Parse(regMax.Match(_catalog.Uri).Value);
+                            int min = int.Parse(regMin.Match(_catalog.Uri).Value);
 
                             string tmpLink = _catalog.Uri;
 
-                            //Выставляем верхнее значение для текущей задачи
-                            if (mMax.Success)
+                            int average = (max + min) / 2;
+
+                            if (max != average && min != average)
                             {
+                                //Выставляем верхнее значение для текущей задачи
                                 _catalog.Uri = regMax.Replace(_catalog.Uri, "" + average);
-                            }
-                            else
-                            {
-                                _catalog.Uri += "&mcpriceto=" + average;
-                            }
 
-                            //Выставляем нижнее значение для новой задачи
-                            if (mMin.Success)
-                            {
+                                //Выставляем нижнее значение для новой задачи
                                 tmpLink = regMin.Replace(tmpLink, "" + (average + 1));
-                            }
-                            else
-                            {
-                                tmpLink += "&mcpricefrom=" + (average + 1);
-                            }
 
-                            //Запускаем новую задачу и добавляем каталог этой задачи ко всем очтальным
-                            Catalog tmpCatalog = new Catalog(_catalog.Name, _catalog.Parent, tmpLink, _catalog.IsGuru);
-                            Spider.catalogs.Add(tmpCatalog);
-                            ThreadPool.QueueUserWorkItem(WaitCallback, tmpCatalog);
-
-                            //Продолжаем текущую задачу
-                            continue;
+                                Catalog cat = new Catalog(_catalog.Name, _catalog.Parent, tmpLink, _catalog.IsGuru);
+                                Spider.catalogs.Insert(Spider.catalogs.IndexOf(_catalog) + 1, cat);
+                                new Downloader(cat, _prx).Processing();
+                                continue;
+                            }
+                            else _checkCount = false;
                         }
-                        else _countItemsOK = true;
+                        else _checkCount = false;
                     }
                     #endregion
 
@@ -199,16 +211,21 @@ namespace YandexMarketParser
                     if (nextPage.Success)
                     {
                         _catalog.Uri = nextPage.Groups["uri"].Value;
-                        _catalog.Uri = new Regex("amp;").Replace(_catalog.Uri, "");//Удаляем, чтобы не перекидывало на первую страницу
+                        _catalog.Uri = _catalog.Uri.Replace("amp;", "");//Удаляем, чтобы не перекидывало на первую страницу
+
+                        Match matchPageNumer = new Regex(@"(?<=page=)\d+").Match(_catalog.Uri);
+                        if ( matchPageNumer.Success && int.Parse(matchPageNumer.Value) > 50) break;
                     }
                     else break;//Если не найдено завершаем работу
                 }
                 catch (Exception exc)
                 {
-                    log.Error("DownloaderError {0} : {1}\nProxy : {2}", _catalog.Uri, exc, prx.Address);
+                    log.Error("DownloaderError {0} : {1}\nProxy : {2}", _catalog.Uri, exc, _prx.Address);
                 }
             } while (true);
-            _catalog.Complited = true;
+            Spider.catalogs.Remove(_catalog);
+            //_catalog.Complited = true;
+            //_countPerProxy[_currentProxyIndex]--;
             log.Info("Finish : {0}", catName);
         }
 
@@ -217,7 +234,7 @@ namespace YandexMarketParser
         /// </summary>
         /// <param name="link"></param>
         /// <returns></returns>
-        public string DownloadPage(string link)
+        private string DownloadPage(string link)
         {
             string page = null;
             for (int i = 0; i < 10; i++)
@@ -235,6 +252,16 @@ namespace YandexMarketParser
                 }
             }
             return page;
+        }
+
+        public static string UsedProxies(){
+            string res = "[";
+            foreach (var cnt in _countPerProxy)
+            {
+                res += cnt + "|";
+            }
+            res += "]";
+            return res;
         }
     }
 }
