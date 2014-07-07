@@ -2,6 +2,7 @@
 using NLog;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Net;
@@ -26,17 +27,10 @@ namespace YandexMarketParser
 
 
         public static readonly string[] _proxyList;
-        //= new string[] {"http://31.28.6.13:8118", "http://31.28.23.219:8118", "http://62.176.28.73:8088", 
-        //    "http://62.176.29.1:8088", "http://62.231.187.137:8080", "http://80.240.129.91:80", "http://81.30.210.118:8080", "http://82.151.120.169:8080", 
-        //    "http://83.174.218.40:8080", "http://85.235.189.38:8118", "http://88.86.218.69:3128", "http://89.148.232.109:3128", "http://92.124.137.77:3128", 
-        //    "http://92.246.205.25:8080", "http://94.41.108.38:3128", "http://109.172.51.147:80", "http://176.192.42.230:80", "http://176.197.229.190:3128", 
-        //    "http://178.33.249.19:80", "http://188.64.221.200:8080", "http://188.130.128.243:80", "http://188.134.91.99:3128","http://188.191.80.8:8080", 
-        //    "http://194.85.142.120:8888", "http://195.112.225.218:8080", "http://212.3.153.25:3128", "http://212.33.244.18:80", "http://212.220.204.20:8080", 
-        //    "http://213.87.117.2:80", "http://217.119.18.106:8080"
-        //};
 
         private static int[] _countPerProxy;
-        private const int _limitPerProxy = 2;//чем больше, тем выше шанс выдать себя
+        private const int _limitPerProxy = 1;
+        private const int _minTimeResponse = 10000;
         private static int _proxyIndex;
         
         private WebProxy _prx;
@@ -85,8 +79,17 @@ namespace YandexMarketParser
             {
                 try
                 {
+                    Stopwatch sw = Stopwatch.StartNew();
+
                     string root = DownloadPage(_catalog.Uri);
 
+                    sw.Stop();
+
+                    if (sw.ElapsedMilliseconds < _minTimeResponse)
+                    {
+                        Console.Write("`");
+                        Thread.Sleep(_minTimeResponse - (int)sw.ElapsedMilliseconds);//для быстрых прокси, чтобы не палиться
+                    }
                     if (root == null)
                     {
                         log.Error("Ошибка. Страница не получена({0}).\nProxy : {1}", _catalog.Uri, _prx.Address);
@@ -95,7 +98,7 @@ namespace YandexMarketParser
                     if (new Regex(patternOi).Match(root).Success)
                     {
                         log.Info("Бежим, Джони! Нас спалили!!! Proxy : {0}", _prx.Address);
-                        Thread.Sleep(600000);
+                        Thread.Sleep(3600000);
                         continue;
                     }
                     Regex regPrice = new Regex(patternPrice);
@@ -104,8 +107,7 @@ namespace YandexMarketParser
                     #region -------------Обход ограничения повторяющихся ссылок после 50 страницы---------
                     //****************************************************************************************
                     //*
-                    //*Разделяем задание на 2 части, если предметов боьше 500. Одна часть остается в этом потоке, вторая запускается в новом.
-                    //*Границу разделения определяем как среднее арифметическое всех цен данной страницы.
+                    //*Разделяем задание на 2 части, если предметов боьше 500.
                     //*
                     //****************************************************************************************
                     if (_checkCount && !_catalog.IsGuru)

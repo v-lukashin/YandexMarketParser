@@ -22,7 +22,7 @@ namespace YandexMarketParser
         public static long countVisitsOnPages = 0;//количество пройденых страниц
         public static List<Catalog> catalogs;
 
-        private const int _poolSize = 20;
+        private readonly int _poolSize = Downloader._proxyList.Count() + 2;
 
         private Stopwatch sw;
 
@@ -31,7 +31,7 @@ namespace YandexMarketParser
         private readonly Catalog _rootCatalog = new Catalog ( "ROOT", "", "/catalog.xml", false );
 
         private readonly Repository _rep;
-        private const string _connectionString = "mongodb://localhost:27017/YandexMarket0702";
+        private const string _connectionString = "mongodb://localhost:27017/YandexMarket0707";
 
         private const string patternCatalog = @"<div class=""supcat(?<guru> guru)?""><a href=""(?<uri>/catalog.xml\?hid=\d*)"">(?:<img[\w\p{P}\p{S} ]*?>)?(?<name>[-\w,. ]*?)</a>";
         private const string patternAll = @"<a class=""top-3-models__title-link"" href=""(?<uri>[-\w\p{P}\p{S} ]*)"">Посмотреть все модели</a>";
